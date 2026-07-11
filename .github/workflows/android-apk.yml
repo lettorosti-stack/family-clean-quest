@@ -5,30 +5,29 @@ on:
   push:
     branches:
       - main
-      - master
 
 jobs:
   build-apk:
-    name: Build Android APK
+    name: Build Android release APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Setup Java
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
+      - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
       - name: Install dependencies
@@ -37,23 +36,30 @@ jobs:
       - name: Check Expo project
         run: npx expo-doctor
 
-      - name: Export Android bundle
-        run: npx expo export --platform android --output-dir dist
-
-      - name: Generate Android project from Expo template
-        shell: bash
+      - name: Generate native Android project
         run: |
           rm -rf android
-          mkdir -p .expo-template
-          tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
-          cp -R .expo-template/package/android ./android
+          npx expo prebuild --platform android --non-interactive
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug
+      - name: Build release APK
         working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Verify release APK
+        shell: bash
+        run: |
+          find android/app/build/outputs/apk -type f -name "*.apk" -print
+          if ! find android/app/build/outputs/apk/release -type f -name "*.apk" | grep -q .; then
+            echo "ERROR: Release APK was not created."
+            exit 1
+          fi
+
+      - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
-          name: family-clean-quest-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: family-clean-quest-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
