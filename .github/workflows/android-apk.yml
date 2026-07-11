@@ -70,14 +70,26 @@ jobs:
           tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
           cp -R .expo-template/package/android ./android
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: app/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          find app/android/app/build/outputs/apk -type f -name "*.apk" -print
+
+          if ! find app/android/app/build/outputs/apk -type f -name "*.apk" | grep -q .; then
+            echo "ERROR: APK file was not created."
+            exit 1
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: family-clean-quest-debug-apk
-          path: app/android/app/build/outputs/apk/debug/*.apk
+          name: family-clean-quest-release-apk
+          path: app/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 14
