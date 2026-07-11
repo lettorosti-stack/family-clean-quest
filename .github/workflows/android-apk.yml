@@ -19,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -50,7 +49,9 @@ jobs:
       - name: Verify release APK
         shell: bash
         run: |
+          echo "Created APK files:"
           find android/app/build/outputs/apk -type f -name "*.apk" -print
+
           if ! find android/app/build/outputs/apk/release -type f -name "*.apk" | grep -q .; then
             echo "ERROR: Release APK was not created."
             exit 1
