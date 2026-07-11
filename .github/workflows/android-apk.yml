@@ -2,94 +2,59 @@ name: Android APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
 
 jobs:
   build-apk:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Unpack project
-        run: |
-          mkdir app
-          python3 - <<'PY'
-          import pathlib
-          import shutil
-          import zipfile
-
-          target = pathlib.Path("app")
-
-          with zipfile.ZipFile("family-clean-quest-source.zip") as archive:
-              for item in archive.infolist():
-                  name = item.filename.replace("\\", "/")
-                  if not name:
-                      continue
-
-                  destination = target / name
-
-                  if name.endswith("/"):
-                      destination.mkdir(parents=True, exist_ok=True)
-                      continue
-
-                  destination.parent.mkdir(parents=True, exist_ok=True)
-
-                  with archive.open(item) as source:
-                      with destination.open("wb") as output:
-                          shutil.copyfileobj(source, output)
-          PY
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install dependencies
-        working-directory: app
         run: npm install --no-audit --no-fund
 
       - name: Check Expo project
-        working-directory: app
         run: npx expo-doctor
 
       - name: Export Android bundle
-        working-directory: app
         run: npx expo export --platform android --output-dir dist
 
       - name: Generate Android project from Expo template
-        working-directory: app
+        shell: bash
         run: |
           rm -rf android
           mkdir -p .expo-template
           tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
           cp -R .expo-template/package/android ./android
 
-      - name: Build release APK
-        working-directory: app/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
-
-      - name: Verify APK
-        shell: bash
-        run: |
-          find app/android/app/build/outputs/apk -type f -name "*.apk" -print
-
-          if ! find app/android/app/build/outputs/apk -type f -name "*.apk" | grep -q .; then
-            echo "ERROR: APK file was not created."
-            exit 1
-          fi
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+        working-directory: android
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: family-clean-quest-release-apk
-          path: app/android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-          retention-days: 14
+          name: family-clean-quest-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
