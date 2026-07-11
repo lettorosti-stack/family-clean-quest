@@ -1,0 +1,59 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Unpack project
+        run: |
+          mkdir app
+          unzip -q family-clean-quest-source.zip -d app
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm install --no-audit --no-fund
+
+      - name: Check Expo project
+        working-directory: app
+        run: npx expo-doctor
+
+      - name: Export Android bundle
+        working-directory: app
+        run: npx expo export --platform android --output-dir dist
+
+      - name: Generate Android project from Expo template
+        working-directory: app
+        run: |
+          rm -rf android
+          mkdir -p .expo-template
+          tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
+          cp -R .expo-template/package/android ./android
+
+      - name: Build debug APK
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-clean-quest-debug-apk
+          path: app/android/app/build/outputs/apk/debug/*.apk
