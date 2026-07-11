@@ -24,7 +24,31 @@ jobs:
       - name: Unpack project
         run: |
           mkdir app
-          unzip -q family-clean-quest-source.zip -d app
+          python3 - <<'PY'
+          import pathlib
+          import shutil
+          import zipfile
+
+          target = pathlib.Path("app")
+
+          with zipfile.ZipFile("family-clean-quest-source.zip") as archive:
+              for item in archive.infolist():
+                  name = item.filename.replace("\\", "/")
+                  if not name:
+                      continue
+
+                  destination = target / name
+
+                  if name.endswith("/"):
+                      destination.mkdir(parents=True, exist_ok=True)
+                      continue
+
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+
+                  with archive.open(item) as source:
+                      with destination.open("wb") as output:
+                          shutil.copyfileobj(source, output)
+          PY
 
       - name: Install dependencies
         working-directory: app
