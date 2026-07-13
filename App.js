@@ -3,7 +3,7 @@ import { AppState, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { WebView } from 'react-native-webview';
 
 import previewHtml from './src/previewHtml';
