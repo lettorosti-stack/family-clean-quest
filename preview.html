@@ -574,6 +574,7 @@
     state.rewardDate = state.rewardDate || today();
     state.deliveryDate = state.deliveryDate || today();
     state.avatars = state.avatars || {};
+    state.avatarUpdatedAt = state.avatarUpdatedAt || {};
     state.customTasks = state.customTasks || [];
     state.passwords = state.passwords || {};
     state.passwordResetRequests = state.passwordResetRequests || [];
@@ -833,6 +834,7 @@
           const height = image.height * scale;
           context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
           state.avatars[state.active] = canvas.toDataURL('image/jpeg', 0.78);
+          state.avatarUpdatedAt[state.active] = new Date().toISOString();
           save();
           showToast('Аватар обновлен и подготовлен для синхронизации.');
           render();
@@ -844,6 +846,7 @@
     }
     function choosePresetAvatar(value) {
       state.avatars[state.active] = value.src;
+      state.avatarUpdatedAt[state.active] = new Date().toISOString();
       avatarPickerOpen = false;
       save();
       showToast('Аватар выбран.');

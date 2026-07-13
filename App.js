@@ -89,11 +89,35 @@ const bridgeScript = `
       .map(function (id) { return byId[id]; });
   }
 
+  function mergeAvatarState(current, remote, replaceSharedState) {
+    if (replaceSharedState) {
+      return {
+        avatars: Object.assign({}, remote.avatars || {}),
+        avatarUpdatedAt: Object.assign({}, remote.avatarUpdatedAt || {})
+      };
+    }
+    var avatars = Object.assign({}, current.avatars || {});
+    var avatarUpdatedAt = Object.assign({}, current.avatarUpdatedAt || {});
+    var remoteAvatars = remote.avatars || {};
+    var remoteTimes = remote.avatarUpdatedAt || {};
+    Object.keys(remoteAvatars).forEach(function (memberId) {
+      var localTime = Date.parse(avatarUpdatedAt[memberId] || '') || 0;
+      var remoteTime = Date.parse(remoteTimes[memberId] || '') || 0;
+      if (!(memberId in avatars) || remoteTime >= localTime) {
+        avatars[memberId] = remoteAvatars[memberId];
+        if (remoteTimes[memberId]) avatarUpdatedAt[memberId] = remoteTimes[memberId];
+      }
+    });
+    return { avatars: avatars, avatarUpdatedAt: avatarUpdatedAt };
+  }
+
   function applyRemoteState(remote, replaceSharedState) {
     var current = readState() || {};
     var tombstones = mergeTombstones(replaceSharedState ? {} : current.syncTombstones, remote.syncTombstones);
+    var avatarState = mergeAvatarState(current, remote, replaceSharedState);
     var next = Object.assign({}, current, {
-      avatars: replaceSharedState ? Object.assign({}, remote.avatars || {}) : Object.assign({}, current.avatars || {}, remote.avatars || {}),
+      avatars: avatarState.avatars,
+      avatarUpdatedAt: avatarState.avatarUpdatedAt,
       completed: mergeRecords(replaceSharedState ? [] : current.completed, remote.completed, tombstones.completed),
       purchases: mergeRecords(replaceSharedState ? [] : current.purchases, remote.purchases, tombstones.purchases),
       customTasks: mergeRecords(replaceSharedState ? [] : current.customTasks, remote.customTasks, tombstones.customTasks),
@@ -108,6 +132,9 @@ const bridgeScript = `
     });
     writeState(next);
     if (typeof window.render === 'function') window.render();
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'remoteApplied' }));
+    }
   }
 
   var originalSetItem = localStorage.setItem.bind(localStorage);
@@ -339,6 +366,26 @@ export default function App() {
   }, [applyRemoteFamilyState, familyCode, pushDiagnostic, syncReady]);
 
   useEffect(() => {
+    if (!syncReady || !isFirebaseConfigured() || !syncRef.current || !familyCode) return undefined;
+    let cancelled = false;
+    const refreshFromCloud = () => {
+      syncRef.current.getFamilyState(familyCode)
+        .then((remoteState) => {
+          if (!cancelled) applyRemoteFamilyState(remoteState, false);
+        })
+        .catch((error) => {
+          if (!cancelled) pushDiagnostic(`Firebase polling refresh: ${error?.message ?? error}`);
+        });
+    };
+    refreshFromCloud();
+    const interval = setInterval(refreshFromCloud, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [applyRemoteFamilyState, familyCode, pushDiagnostic, syncReady]);
+
+  useEffect(() => {
     if (!isFirebaseConfigured() || !syncRef.current) return undefined;
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active' && familyCode) {
@@ -446,6 +493,12 @@ export default function App() {
 
     if (['htmlReady', 'diagnostic'].includes(message?.type)) {
       pushDiagnostic(`${message.type}: ${message.value}`);
+      return;
+    }
+
+    if (message?.type === 'remoteApplied') {
+      applyingRemoteRef.current = false;
+      joiningFamilyRef.current = false;
       return;
     }
 
