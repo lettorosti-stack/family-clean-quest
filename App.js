@@ -234,6 +234,23 @@ export default function App() {
     setDiagnostics((items) => [...items.slice(-7), `${new Date().toLocaleTimeString()}: ${message}`]);
   }, []);
 
+  const applyRemoteFamilyState = useCallback((remoteState, replace = false) => {
+    if (!remoteState || !syncRef.current) return;
+    const shared = syncRef.current.toSharedFamilyState(remoteState, familyCode);
+    lastRemoteStateRef.current = { value: shared, replace };
+    applyingRemoteRef.current = true;
+    webViewRef.current?.postMessage(JSON.stringify({
+      type: 'remoteFamilyState',
+      value: shared,
+      replace,
+    }));
+    setSyncStatus('connected');
+    setTimeout(() => {
+      applyingRemoteRef.current = false;
+      joiningFamilyRef.current = false;
+    }, 900);
+  }, [familyCode]);
+
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -310,23 +327,8 @@ export default function App() {
           setSyncStatus('waiting');
           return;
         }
-        const shared = syncRef.current.toSharedFamilyState(remoteState, familyCode);
-        lastRemoteStateRef.current = {
-          value: shared,
-          replace: replaceNextRemoteRef.current,
-        };
-        applyingRemoteRef.current = true;
-        webViewRef.current?.postMessage(JSON.stringify({
-          type: 'remoteFamilyState',
-          value: shared,
-          replace: replaceNextRemoteRef.current,
-        }));
+        applyRemoteFamilyState(remoteState, replaceNextRemoteRef.current);
         replaceNextRemoteRef.current = false;
-        setSyncStatus('connected');
-        setTimeout(() => {
-          applyingRemoteRef.current = false;
-          joiningFamilyRef.current = false;
-        }, 900);
       },
       (error) => {
         setSyncStatus('error');
@@ -334,11 +336,19 @@ export default function App() {
         console.warn('Family sync subscribe failed', error);
       },
     );
-  }, [familyCode, pushDiagnostic, syncReady]);
+  }, [applyRemoteFamilyState, familyCode, pushDiagnostic, syncReady]);
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !syncRef.current) return undefined;
     const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && familyCode) {
+        syncRef.current.getFamilyState(familyCode)
+          .then((remoteState) => applyRemoteFamilyState(remoteState, false))
+          .catch((error) => {
+            pushDiagnostic(`Firebase foreground refresh: ${error?.message ?? error}`);
+          });
+        return;
+      }
       if (nextState !== 'background' && nextState !== 'inactive') return;
       if (!lastSharedStateRef.current) return;
       if (!familyCode) return;
@@ -352,7 +362,7 @@ export default function App() {
         });
     });
     return () => subscription.remove();
-  }, [deviceId, familyCode, pushDiagnostic]);
+  }, [applyRemoteFamilyState, deviceId, familyCode, pushDiagnostic]);
 
   const handleSyncCommand = useCallback(async (message) => {
     if (!isFirebaseConfigured() || !syncRef.current) throw new Error('Firebase не настроен');

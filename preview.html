@@ -604,7 +604,16 @@
     }
     function member(id) { return members.find(item => item.id === id); }
     function allTasks() { return [...tasks, ...state.customTasks]; }
-    function save() { localStorage.setItem('cleanQuestPreview', JSON.stringify(state)); }
+    function save() {
+      localStorage.setItem('cleanQuestPreview', JSON.stringify(state));
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'state',
+          reason: 'save',
+          value: state
+        }));
+      }
+    }
     function markRecordDeleted(group, id) {
       state.syncTombstones[group] = state.syncTombstones[group] || {};
       state.syncTombstones[group][String(id)] = new Date().toISOString();
@@ -1092,7 +1101,7 @@
       });
       document.querySelector('.tabs').style.display = state.active ? 'grid' : 'none';
       document.getElementById('topLogout').style.display = state.active ? 'block' : 'none';
-      document.getElementById('topSync').style.display = member(state.active)?.role === 'parent' ? 'block' : 'none';
+      document.getElementById('topSync').style.display = state.active ? 'block' : 'none';
     }
     function renderHome() {
       const personalTasks = personalTasksForActive();

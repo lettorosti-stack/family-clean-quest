@@ -137,6 +137,13 @@ export async function familyExists(familyCode) {
   return (await getDoc(getFamilyDoc(familyCode))).exists();
 }
 
+export async function getFamilyState(familyCode) {
+  if (!isFirebaseConfigured()) return null;
+  await ensureAnonymousAuth();
+  const snapshot = await getDoc(getFamilyDoc(familyCode));
+  return snapshot.exists() ? snapshot.data() : null;
+}
+
 export function subscribeFamilyState(familyCode, onChange, onError) {
   if (!isFirebaseConfigured() || !isValidFamilyCode(familyCode)) return () => {};
   let unsubscribe = () => {};
