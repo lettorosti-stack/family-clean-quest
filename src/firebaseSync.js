@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
@@ -9,28 +8,12 @@ import {
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
-import appConfig from '../app.json';
+import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 
-const extra = {
-  ...(appConfig.expo?.extra ?? {}),
-  ...(Constants.expoConfig?.extra ?? {}),
-};
+export { isFirebaseConfigured };
 const FAMILY_CODE_LENGTH = 12;
 const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
-
-const firebaseConfig = {
-  apiKey: extra.firebaseApiKey,
-  authDomain: extra.firebaseAuthDomain,
-  projectId: extra.firebaseProjectId,
-  storageBucket: extra.firebaseStorageBucket,
-  messagingSenderId: extra.firebaseMessagingSenderId,
-  appId: extra.firebaseAppId,
-};
-
-export function isFirebaseConfigured() {
-  return Boolean(firebaseConfig.apiKey && !String(firebaseConfig.apiKey).startsWith('YOUR_'));
-}
 
 export function normalizeFamilyCode(value) {
   return String(value ?? '')
