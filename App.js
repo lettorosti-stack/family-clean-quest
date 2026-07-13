@@ -3,6 +3,7 @@ import { AppState, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system';
 import { WebView } from 'react-native-webview';
 
 import previewHtml from './src/previewHtml';
@@ -178,18 +179,57 @@ export default function App() {
   const syncRef = useRef(getFirebaseSync());
   const [loadError, setLoadError] = useState(null);
   const [diagnostics, setDiagnostics] = useState([]);
+  const [htmlFileUri, setHtmlFileUri] = useState(null);
 
   const webViewSource = useMemo(
-    () => ({
-      html: diagnosticMode === 'webview-minimal' ? minimalWebViewHtml : previewHtml,
-      baseUrl: 'https://localhost',
-    }),
-    [],
+    () => {
+      if (diagnosticMode === 'webview-minimal') {
+        return {
+          html: minimalWebViewHtml,
+          baseUrl: 'https://localhost',
+        };
+      }
+      if (!htmlFileUri) return null;
+      return { uri: htmlFileUri };
+    },
+    [htmlFileUri],
   );
 
   const pushDiagnostic = useCallback((message) => {
     setDiagnostics((items) => [...items.slice(-7), `${new Date().toLocaleTimeString()}: ${message}`]);
   }, []);
+
+  useEffect(() => {
+    if (diagnosticMode === 'webview-minimal' || diagnosticMode === 'rn-root') return undefined;
+
+    let cancelled = false;
+    const baseDirectory = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+    if (!baseDirectory) {
+      const text = 'HTML file write failed: cache directory is not available';
+      pushDiagnostic(text);
+      setLoadError(text);
+      return undefined;
+    }
+
+    const htmlPath = `${baseDirectory}family-clean-quest-preview.html`;
+
+    FileSystem.writeAsStringAsync(htmlPath, previewHtml)
+      .then(() => {
+        if (!cancelled) {
+          setHtmlFileUri(htmlPath);
+          pushDiagnostic(`HTML file ready: ${htmlPath}`);
+        }
+      })
+      .catch((error) => {
+        const text = `HTML file write failed: ${error?.message ?? error}`;
+        pushDiagnostic(text);
+        setLoadError(text);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pushDiagnostic]);
 
   useEffect(() => {
     if (!isFirebaseConfigured() || !syncRef.current) return undefined;
@@ -310,6 +350,14 @@ export default function App() {
           <View style={styles.errorBox}>
             <Text style={styles.errorTitle}>Не удалось открыть приложение</Text>
             <Text style={styles.errorText}>{loadError}</Text>
+            {diagnostics.map((item) => (
+              <Text key={item} style={styles.diagnosticText}>{item}</Text>
+            ))}
+          </View>
+        ) : !webViewSource ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorTitle}>Загрузка интерфейса...</Text>
+            <Text style={styles.errorText}>Подготавливаем экран приложения.</Text>
             {diagnostics.map((item) => (
               <Text key={item} style={styles.diagnosticText}>{item}</Text>
             ))}
