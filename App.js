@@ -547,11 +547,13 @@ export default function App() {
       memberId: message.value.active,
       deviceId,
     })
-      .then(() => {
+      .then(() => syncRef.current.getFamilyState(familyCode))
+      .then((remoteState) => {
+        if (remoteState) applyRemoteFamilyState(remoteState, false);
         if (isForceSync) {
           webViewRef.current?.postMessage(JSON.stringify({
             type: 'syncStatus',
-            text: 'Синхронизация выполнена',
+            text: 'Данные отправлены и получены с сервера',
           }));
         }
       })
@@ -566,7 +568,7 @@ export default function App() {
           }));
         }
       });
-  }, [deviceId, familyCode, handleSyncCommand, pushDiagnostic]);
+  }, [applyRemoteFamilyState, deviceId, familyCode, handleSyncCommand, pushDiagnostic]);
 
   if (diagnosticMode === 'rn-root') {
     return (

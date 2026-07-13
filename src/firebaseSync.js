@@ -3,6 +3,7 @@ import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
   doc,
   getDoc,
+  getDocFromServer,
   getFirestore,
   onSnapshot,
   runTransaction,
@@ -161,7 +162,7 @@ export async function familyExists(familyCode) {
 export async function getFamilyState(familyCode) {
   if (!isFirebaseConfigured()) return null;
   await ensureAnonymousAuth();
-  const snapshot = await getDoc(getFamilyDoc(familyCode));
+  const snapshot = await getDocFromServer(getFamilyDoc(familyCode));
   return snapshot.exists() ? snapshot.data() : null;
 }
 
