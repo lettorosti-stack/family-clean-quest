@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Family Clean Quest",
+    "name": "Семейные дела",
     "slug": "family-clean-quest",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,7 @@
     ],
     "android": {
       "package": "com.familycleanquest",
+      "icon": "./assets/app-icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/app-icon.png",
         "backgroundColor": "#ffffff"
