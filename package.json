@@ -1,11 +1,12 @@
 {
   "name": "family-clean-quest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "expo/AppEntry",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "web": "expo start --web",
+    "check:preview": "node scripts/check-preview-js.mjs",
     "generate:preview": "node scripts/generate-preview-html.js",
     "doctor": "expo-doctor",
     "export:android": "expo export --platform android --output-dir dist",
