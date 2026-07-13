@@ -42,6 +42,16 @@ jobs:
       - name: Generate native Android project
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Verify Android app metadata
+        shell: bash
+        run: |
+          echo "Generated Android strings:"
+          cat android/app/src/main/res/values/strings.xml
+          if grep -R "Hello App Display Name" -n android/app/src/main; then
+            echo "Template app name is still present. Expo config was not applied."
+            exit 1
+          fi
+
       - name: Build APKs
         run: ./gradlew assembleDebug assembleRelease
         working-directory: android
