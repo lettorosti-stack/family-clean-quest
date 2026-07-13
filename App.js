@@ -7,9 +7,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 
+import appConfig from './app.json';
 import previewHtml from './src/previewHtml';
 
-const extra = Constants.expoConfig?.extra ?? {};
+const extra = {
+  ...(appConfig.expo?.extra ?? {}),
+  ...(Constants.expoConfig?.extra ?? {}),
+};
 const diagnosticMode = String(extra.diagnosticMode ?? 'preview');
 const minimalWebViewHtml = '<html><body><h1>WebView работает</h1></body></html>';
 const FAMILY_CODE_STORAGE_KEY = 'family-clean-quest-family-code-v1';

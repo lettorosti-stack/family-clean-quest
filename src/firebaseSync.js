@@ -9,8 +9,12 @@ import {
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
+import appConfig from '../app.json';
 
-const extra = Constants.expoConfig?.extra ?? {};
+const extra = {
+  ...(appConfig.expo?.extra ?? {}),
+  ...(Constants.expoConfig?.extra ?? {}),
+};
 const FAMILY_CODE_LENGTH = 12;
 const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
