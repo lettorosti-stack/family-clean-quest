@@ -562,9 +562,11 @@ export default function App() {
         pushDiagnostic(`Firebase publish: ${error?.message ?? error}`);
         console.warn('Family sync publish failed', error);
         if (isForceSync) {
+          const errorCode = error?.code ? ` [${error.code}]` : '';
+          const errorMessage = error?.message || 'неизвестная ошибка';
           webViewRef.current?.postMessage(JSON.stringify({
             type: 'syncStatus',
-            text: 'Ошибка синхронизации. Проверьте интернет и настройки Firebase.',
+            text: `Ошибка синхронизации${errorCode}: ${errorMessage}`,
           }));
         }
       });
