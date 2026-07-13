@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/{familyId} {
+      allow read: if request.auth != null
+        && familyId.matches('^[A-Z0-9]{12}$');
+
+      allow create, update: if request.auth != null
+        && familyId.matches('^[A-Z0-9]{12}$')
+        && request.resource.data.familyId == familyId;
+
+      allow delete: if false;
+    }
+  }
+}
