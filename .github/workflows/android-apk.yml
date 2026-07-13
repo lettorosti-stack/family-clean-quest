@@ -1,1 +1,67 @@
+name: Android APK
 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate embedded preview HTML
+        run: npm run generate:preview
+
+      - name: Check Expo project
+        run: npx expo-doctor
+
+      - name: Export Android bundle
+        run: npx expo export --platform android --output-dir dist
+
+      - name: Generate Android project from Expo template
+        shell: bash
+        run: |
+          rm -rf android
+          mkdir -p .expo-template
+          tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
+          cp -R .expo-template/package/android ./android
+
+      - name: Build APKs
+        run: ./gradlew assembleDebug assembleRelease
+        working-directory: android
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-clean-quest-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: family-clean-quest-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
