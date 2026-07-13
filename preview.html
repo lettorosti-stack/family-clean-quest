@@ -59,7 +59,10 @@
     .zone.selected { outline: 2px solid #0f766e; }
     .zone-top { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
     .zone-title { font-size: 13px; line-height: 1.12; font-weight: 900; overflow-wrap: anywhere; }
-    .zone-icon { width: 120px; height: 98px; object-fit: contain; align-self: center; margin: 0; }
+    .zone-icon-wrap { position: relative; align-self: center; display: grid; place-items: center; width: 126px; height: 102px; }
+    .zone-icon { width: 120px; height: 98px; object-fit: contain; margin: 0; pointer-events: none; }
+    .zone-zoom { position: absolute; right: 0; top: 0; width: 30px; height: 30px; border-radius: 15px; background: rgba(15, 23, 42, .74); color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 900; box-shadow: 0 6px 14px rgba(15, 23, 42, .22); cursor: zoom-in; }
+    .zone-zoom:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
     .status { width: max-content; min-height: 28px; border-radius: 14px; padding: 4px 9px; font-size: 10px; line-height: 1.05; font-weight: 900; white-space: nowrap; text-align: center; display: inline-flex; align-items: center; justify-content: center; align-self: center; }
     .status.red { background: #ffe4e6; color: #be123c; }
     .status.yellow { background: #fef3c7; color: #b45309; }
@@ -1052,7 +1055,7 @@
             ${group.zones.map(zone => {
               const [label, color] = zoneStatus(zone);
               return `<button class="zone ${zone.wide ? 'wide' : ''} ${state.selectedZone?.id === zone.id ? 'selected' : ''}" data-zone="${zone.id}">
-                <div class="zone-top"><b class="zone-title">${zone.title}</b>${zoneIcons[zone.id] ? `<img class="zone-icon" src="${zoneIcons[zone.id]}" alt="">` : ''}</div><span class="status ${color}">${label}</span>
+                <div class="zone-top"><b class="zone-title">${zone.title}</b>${zoneIcons[zone.id] ? `<span class="zone-icon-wrap"><img class="zone-icon" src="${zoneIcons[zone.id]}" alt="${zone.title}"><span class="zone-zoom" role="button" tabindex="0" data-zone-zoom="${zone.id}" aria-label="Увеличить иконку">⌕</span></span>` : ''}</div><span class="status ${color}">${label}</span>
               </button>`;
             }).join('')}
           </div>`).join('')}`;
@@ -1635,7 +1638,20 @@
     const bindContentWithIconZoom = bindContent;
     bindContent = function() {
       bindContentWithIconZoom();
-      document.querySelectorAll('img.zone-icon, img.task-card-icon, img.reward-card-icon, img.nav-icon, #teamScore img').forEach(img => {
+      document.querySelectorAll('[data-zone-zoom]').forEach(btn => {
+        btn.onclick = (event) => {
+          event.stopPropagation();
+          const allZones = zoneGroups.flatMap(group => group.zones);
+          const zone = allZones.find(item => item.id === btn.dataset.zoneZoom);
+          if (zone && zoneIcons[zone.id]) showAvatarPreview(zoneIcons[zone.id], zone.title);
+        };
+        btn.onkeydown = (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          btn.click();
+        };
+      });
+      document.querySelectorAll('img.task-card-icon, img.reward-card-icon, img.nav-icon, #teamScore img').forEach(img => {
         img.classList.add('zoomable-icon');
         img.onclick = (event) => {
           event.stopPropagation();

@@ -29,31 +29,49 @@ function assetToDataUri(assetPath) {
   return `data:${mime};base64,${data}`;
 }
 
-function collectAssetMap() {
-  const assetsDir = path.join(rootDir, 'assets');
+function embedLiteralAssets(html) {
+  return html.replace(/(["'`])(assets\/[^"'`]+\.(?:png|jpe?g|gif|svg|webp))\1/gi, (match, quote, assetPath) => {
+    const dataUri = assetToDataUri(assetPath);
+    return `${quote}${dataUri}${quote}`;
+  });
+}
+
+function patchDynamicAssetCalls(html) {
+  return html
+    .replace(
+      "if (!icon) return 'assets/icons/tasks-list-transparent.png';\n      return icon.includes('/') ? icon : `assets/task-icons/${icon}.png`;",
+      "if (!icon) return window.cleanQuestAssetUrl('assets/icons/tasks-list-transparent.png');\n      return window.cleanQuestAssetUrl(icon.includes('/') ? icon : `assets/task-icons/${icon}.png`);"
+    )
+    .replace(
+      "return `assets/reward-icons/${icon}.png`;",
+      "return window.cleanQuestAssetUrl(`assets/reward-icons/${icon}.png`);"
+    );
+}
+
+function collectDynamicAssetMap() {
+  const folders = [
+    path.join(rootDir, 'assets', 'task-icons'),
+    path.join(rootDir, 'assets', 'reward-icons'),
+  ];
   const map = {};
 
-  function walk(dir) {
-    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, item.name);
-      if (item.isDirectory()) {
-        walk(fullPath);
-        continue;
-      }
-
+  for (const folder of folders) {
+    if (!fs.existsSync(folder)) continue;
+    for (const item of fs.readdirSync(folder, { withFileTypes: true })) {
+      if (!item.isFile()) continue;
       const ext = path.extname(item.name).toLowerCase();
       if (!mimeByExt[ext]) continue;
 
+      const fullPath = path.join(folder, item.name);
       const relativePath = path.relative(rootDir, fullPath).replace(/\\/g, '/');
       map[relativePath] = assetToDataUri(relativePath);
     }
   }
 
-  walk(assetsDir);
   return map;
 }
 
-function buildAssetRuntime(assetMap) {
+function buildDynamicAssetRuntime(assetMap) {
   return `
   <script>
     (function() {
@@ -78,52 +96,12 @@ function buildAssetRuntime(assetMap) {
         return assetData[key] || value;
       };
 
-      function patchImage(img) {
-        var current = img.getAttribute('src');
-        var next = window.cleanQuestAssetUrl(current);
-        if (next && next !== current) img.setAttribute('src', next);
-      }
-
-      function patchImages(root) {
-        if (!root) return;
-        if (root.tagName === 'IMG') patchImage(root);
-        if (root.querySelectorAll) {
-          root.querySelectorAll('img').forEach(patchImage);
-        }
-      }
-
-      function start() {
-        patchImages(document);
-        var observer = new MutationObserver(function(records) {
-          records.forEach(function(record) {
-            if (record.type === 'attributes') {
-              patchImages(record.target);
-              return;
-            }
-            record.addedNodes.forEach(function(node) {
-              if (node.nodeType === 1) patchImages(node);
-            });
-          });
-        });
-        observer.observe(document.documentElement, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['src']
-        });
-      }
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start, { once: true });
-      } else {
-        start();
-      }
     })();
   </script>`;
 }
 
-function injectAssetRuntime(html, assetMap) {
-  const runtime = buildAssetRuntime(assetMap);
+function injectDynamicAssetRuntime(html, assetMap) {
+  const runtime = buildDynamicAssetRuntime(assetMap);
   if (html.includes('</head>')) {
     return html.replace('</head>', `${runtime}\n</head>`);
   }
@@ -131,12 +109,14 @@ function injectAssetRuntime(html, assetMap) {
 }
 
 const sourceHtml = fs.readFileSync(inputPath, 'utf8');
-const assetMap = collectAssetMap();
-const htmlWithEmbeddedAssets = injectAssetRuntime(sourceHtml, assetMap);
+const dynamicAssetMap = collectDynamicAssetMap();
+const patchedHtml = patchDynamicAssetCalls(sourceHtml);
+const htmlWithLiteralAssets = embedLiteralAssets(patchedHtml);
+const htmlWithEmbeddedAssets = injectDynamicAssetRuntime(htmlWithLiteralAssets, dynamicAssetMap);
 const moduleSource = `const previewHtml = ${JSON.stringify(htmlWithEmbeddedAssets)};\n\nexport default previewHtml;\n`;
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, moduleSource, 'utf8');
 
 const sizeMb = (fs.statSync(outputPath).size / 1024 / 1024).toFixed(1);
-console.log(`Generated ${path.relative(rootDir, outputPath)} (${sizeMb} MB, ${Object.keys(assetMap).length} embedded assets)`);
+console.log(`Generated ${path.relative(rootDir, outputPath)} (${sizeMb} MB, ${Object.keys(dynamicAssetMap).length} dynamic assets)`);
