@@ -86,13 +86,32 @@ function mergeRecords(localRecords, remoteRecords, tombstones = {}) {
     .sort((a, b) => recordTime(b) - recordTime(a));
 }
 
+function mergeAvatars(localState, remoteState) {
+  const localAvatars = toObject(localState?.avatars);
+  const remoteAvatars = toObject(remoteState?.avatars);
+  const localTimes = toObject(localState?.avatarUpdatedAt);
+  const remoteTimes = toObject(remoteState?.avatarUpdatedAt);
+  const avatars = { ...localAvatars };
+  const avatarUpdatedAt = { ...localTimes };
+  new Set([...Object.keys(localAvatars), ...Object.keys(remoteAvatars)]).forEach((memberId) => {
+    const localTime = tombstoneTime(localTimes[memberId]);
+    const remoteTime = tombstoneTime(remoteTimes[memberId]);
+    if (!(memberId in avatars) || remoteTime >= localTime) {
+      if (memberId in remoteAvatars) avatars[memberId] = remoteAvatars[memberId];
+      if (memberId in remoteTimes) avatarUpdatedAt[memberId] = remoteTimes[memberId];
+    }
+  });
+  return { avatars, avatarUpdatedAt };
+}
+
 export function toSharedFamilyState(state, familyCode) {
   const normalized = normalizeFamilyCode(familyCode ?? state?.familyId);
   const tombstones = mergeTombstones(state?.syncTombstones, {});
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     familyId: normalized,
     avatars: toObject(state?.avatars),
+    avatarUpdatedAt: toObject(state?.avatarUpdatedAt),
     completed: mergeRecords(state?.completed, [], tombstones.completed),
     purchases: mergeRecords(state?.purchases, [], tombstones.purchases),
     customTasks: mergeRecords(state?.customTasks, [], tombstones.customTasks),
@@ -113,11 +132,13 @@ export function mergeFamilyState(localState, remoteState) {
   if (!remote || typeof remote !== 'object') return localState;
   const familyId = normalizeFamilyCode(remote.familyId ?? localState?.familyId);
   const tombstones = mergeTombstones(localState?.syncTombstones, remote.syncTombstones);
+  const avatarState = mergeAvatars(localState, remote);
   return {
     ...localState,
-    schemaVersion: 3,
+    schemaVersion: 4,
     familyId,
-    avatars: { ...toObject(localState?.avatars), ...toObject(remote.avatars) },
+    avatars: avatarState.avatars,
+    avatarUpdatedAt: avatarState.avatarUpdatedAt,
     completed: mergeRecords(localState?.completed, remote.completed, tombstones.completed),
     purchases: mergeRecords(localState?.purchases, remote.purchases, tombstones.purchases),
     customTasks: mergeRecords(localState?.customTasks, remote.customTasks, tombstones.customTasks),

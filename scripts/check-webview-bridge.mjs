@@ -35,4 +35,21 @@ listeners.document.message({
 assert.equal(receivedConfig?.configured, true);
 assert.equal(context.window.__familySyncConfig.configured, true);
 
+localStorage.setItem('cleanQuestPreview', JSON.stringify({
+  avatars: { diana: 'old-avatar' },
+  avatarUpdatedAt: { diana: '2026-07-13T10:00:00.000Z' },
+}));
+listeners.document.message({
+  data: JSON.stringify({
+    type: 'remoteFamilyState',
+    value: {
+      avatars: { diana: 'new-avatar' },
+      avatarUpdatedAt: { diana: '2026-07-13T11:00:00.000Z' },
+    },
+  }),
+});
+const mergedState = JSON.parse(localStorage.getItem('cleanQuestPreview'));
+assert.equal(mergedState.avatars.diana, 'new-avatar');
+assert.equal(mergedState.avatarUpdatedAt.diana, '2026-07-13T11:00:00.000Z');
+
 console.log('WebView bridge accepts Android document messages.');
