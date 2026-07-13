@@ -1,0 +1,21 @@
+node_modules/
+android/
+ios/
+dist/
+.expo/
+/.expo/
+.expo
+.expo-shared/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.apk
+*.zip
+src/previewHtml.js
+assets-backup-before-optimization-*/
+github-upload-ready/
+github-upload-parts/
+github-upload-changed-only/
+apk-inspect/
+Новая папка/
+.repo-worktree/
