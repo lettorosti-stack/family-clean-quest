@@ -7,22 +7,14 @@ import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 
-import appConfig from './app.json';
+import { isFirebaseConfigured } from './src/firebaseConfig';
 import previewHtml from './src/previewHtml';
 
-const extra = {
-  ...(appConfig.expo?.extra ?? {}),
-  ...(Constants.expoConfig?.extra ?? {}),
-};
+const extra = Constants.expoConfig?.extra ?? {};
 const diagnosticMode = String(extra.diagnosticMode ?? 'preview');
 const minimalWebViewHtml = '<html><body><h1>WebView работает</h1></body></html>';
 const FAMILY_CODE_STORAGE_KEY = 'family-clean-quest-family-code-v1';
 const DEVICE_ID_STORAGE_KEY = 'family-clean-quest-device-id-v1';
-
-function isFirebaseConfigured() {
-  const apiKey = extra.firebaseApiKey;
-  return Boolean(apiKey && !String(apiKey).startsWith('YOUR_'));
-}
 
 function getFirebaseSync() {
   if (!isFirebaseConfigured()) return null;
