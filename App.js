@@ -118,7 +118,7 @@ const bridgeScript = `
     }
   };
 
-  window.addEventListener('message', function (event) {
+  function handleNativeMessage(event) {
     try {
       var message = JSON.parse(event.data);
       if (message && message.type === 'remoteFamilyState' && message.value) {
@@ -132,7 +132,10 @@ const bridgeScript = `
         window.showToast(message.text);
       }
     } catch (error) {}
-  });
+  }
+
+  window.addEventListener('message', handleNativeMessage);
+  document.addEventListener('message', handleNativeMessage);
 
   document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () { postState('ready'); }, 400);

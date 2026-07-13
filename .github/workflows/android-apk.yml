@@ -36,6 +36,9 @@ jobs:
       - name: Validate preview JavaScript
         run: npm run check:preview
 
+      - name: Validate Android WebView bridge
+        run: npm run check:bridge
+
       - name: Generate embedded preview HTML
         run: npm run generate:preview
 
