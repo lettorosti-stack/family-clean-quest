@@ -39,16 +39,8 @@ jobs:
       - name: Check Expo project
         run: npx expo-doctor
 
-      - name: Export Android bundle
-        run: npx expo export --platform android --output-dir dist
-
-      - name: Generate Android project from Expo template
-        shell: bash
-        run: |
-          rm -rf android
-          mkdir -p .expo-template
-          tar -xzf node_modules/expo/template.tgz -C .expo-template package/android
-          cp -R .expo-template/package/android ./android
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --clean --no-install
 
       - name: Build APKs
         run: ./gradlew assembleDebug assembleRelease
