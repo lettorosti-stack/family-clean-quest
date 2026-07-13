@@ -4,7 +4,7 @@ import {
   doc,
   getDoc,
   getDocFromServer,
-  getFirestore,
+  initializeFirestore,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -15,6 +15,7 @@ export { isFirebaseConfigured };
 const FAMILY_CODE_LENGTH = 12;
 const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
+let firestoreInstance = null;
 
 export function normalizeFamilyCode(value) {
   return String(value ?? '')
@@ -39,10 +40,20 @@ function getFirebaseApp() {
   return getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 }
 
+function getFirestoreDb() {
+  if (!firestoreInstance) {
+    firestoreInstance = initializeFirestore(getFirebaseApp(), {
+      experimentalForceLongPolling: true,
+      experimentalLongPollingOptions: { timeoutSeconds: 15 },
+    });
+  }
+  return firestoreInstance;
+}
+
 function getFamilyDoc(familyCode) {
   const normalized = normalizeFamilyCode(familyCode);
   if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
-  return doc(getFirestore(getFirebaseApp()), 'families', normalized);
+  return doc(getFirestoreDb(), 'families', normalized);
 }
 
 async function ensureAnonymousAuth() {
@@ -192,7 +203,7 @@ export async function publishFamilyState(familyCode, state, meta = {}) {
   if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
   const user = await ensureAnonymousAuth();
   const reference = getFamilyDoc(normalized);
-  await runTransaction(getFirestore(getFirebaseApp()), async (transaction) => {
+  await runTransaction(getFirestoreDb(), async (transaction) => {
     const snapshot = await transaction.get(reference);
     const remote = snapshot.exists() ? snapshot.data() : {};
     const merged = mergeFamilyState(remote, toSharedFamilyState(state, normalized));
