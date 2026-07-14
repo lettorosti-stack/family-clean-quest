@@ -149,7 +149,11 @@ const bridgeScript = `
     try {
       var message = JSON.parse(event.data);
       if (message && message.type === 'remoteFamilyState' && message.value) {
-        applyRemoteState(message.value, Boolean(message.replace));
+        if (typeof window.shouldDeferFamilySyncApply === 'function' && window.shouldDeferFamilySyncApply()) {
+          window.__pendingRemoteFamilyState = message;
+        } else {
+          applyRemoteState(message.value, Boolean(message.replace));
+        }
       }
       if (message && message.type === 'syncConfig' && message.value) {
         window.__familySyncConfig = message.value;
@@ -160,6 +164,14 @@ const bridgeScript = `
       }
     } catch (error) {}
   }
+
+  window.__flushPendingFamilyState = function () {
+    var message = window.__pendingRemoteFamilyState;
+    if (!message) return;
+    if (typeof window.shouldDeferFamilySyncApply === 'function' && window.shouldDeferFamilySyncApply()) return;
+    window.__pendingRemoteFamilyState = null;
+    applyRemoteState(message.value, Boolean(message.replace));
+  };
 
   window.addEventListener('message', handleNativeMessage);
   document.addEventListener('message', handleNativeMessage);

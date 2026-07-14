@@ -29,6 +29,25 @@ if (!html.includes('id="dailyQuoteButton"') || !html.includes('id="quoteModal"')
 if (!html.includes('id="historyTaskPicker"') || !html.includes('data-history-task-option')) {
   throw new Error('Stable manual history picker is missing');
 }
+if (!html.includes('id="historyAreaPicker"') || !html.includes('data-history-area-option')) {
+  throw new Error('Manual history room picker is missing');
+}
+if (!html.includes('.filter(task => task.area === historyAreaSelection)')) {
+  throw new Error('Manual history tasks are not filtered by the selected room');
+}
+if (!html.includes("repeatableDailyTaskLimits = new Map([['kitchen-dishes', 4]])")) {
+  throw new Error('Four-times-daily dish washing completion policy is missing');
+}
+if (!html.includes("perMemberDailyTaskIds = new Set(['garden-water', 'garden-weed'])")
+  || !html.includes("task?.area === 'помощь бабушке и дедушке'")) {
+  throw new Error('Per-member shared task completion policy is missing');
+}
+if (!html.includes('id="historyTaskOptions"') || !html.includes('historyTaskOptions.scrollTop = historyTaskScrollTop')) {
+  throw new Error('Manual history picker does not preserve its scroll position');
+}
+if (!html.includes('window.shouldDeferFamilySyncApply')) {
+  throw new Error('Manual history picker does not defer background sync rendering');
+}
 if (html.includes('<select class="select-input" id="historyTask"')) {
   throw new Error('Native history task select must not be used in Android WebView');
 }
