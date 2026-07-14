@@ -866,8 +866,27 @@
         state.active
       );
     }
+    const repeatableDailyTaskLimits = new Map([['kitchen-dishes', 4]]);
+    const perMemberDailyTaskIds = new Set(['garden-water', 'garden-weed']);
+    function taskCompletionPolicy(task) {
+      if (repeatableDailyTaskLimits.has(task?.id)) return 'repeat';
+      if (perMemberDailyTaskIds.has(task?.id) || task?.area === 'помощь бабушке и дедушке') return 'per-member';
+      return 'single';
+    }
+    function taskDoneFor(task, memberId, date = today()) {
+      const policy = taskCompletionPolicy(task);
+      const matching = state.completed.filter(item =>
+        item.date === date
+        && (item.taskId === task.id || item.title === task.title)
+        && (policy !== 'per-member' || item.memberId === memberId)
+      );
+      if (policy === 'repeat') {
+        return matching.length >= repeatableDailyTaskLimits.get(task.id) ? matching[0] : null;
+      }
+      return matching[0];
+    }
     function renderTaskCard(task) {
-      const done = state.completed.find(x => x.date === today() && (x.taskId === task.id || x.title === task.title));
+      const done = taskDoneFor(task, state.active);
       const doneBy = done ? member(done.memberId) : null;
       return `<button class="card ${done ? 'done' : ''}" data-task="${task.id}">
         <img class="task-card-icon" src="${taskIconSrc(task)}" alt="">
@@ -1324,7 +1343,7 @@
           ${state.selectedZone ? '<button class="small-btn" id="clearFilter">все</button>' : ''}
         </div>
         ${filtered.map(task => {
-          const done = state.completed.find(x => x.date === today() && (x.taskId === task.id || x.title === task.title));
+          const done = taskDoneFor(task, state.active);
           return `<button class="card ${done ? 'done' : ''}" data-task="${task.id}">
           <img class="task-card-icon" src="${taskIconSrc(task)}" alt="">
           <div class="card-main"><div class="task-title">${task.title}</div><div class="meta">${done ? `сделано сегодня: ${member(done.memberId).name}` : `${task.area} · ${task.cadence}`}</div></div>
@@ -1519,9 +1538,11 @@
         showToast('Дети могут отмечать выполненные дела только за сегодняшний день.');
         return;
       }
-      const alreadyDone = state.completed.some(x => x.date === doneDate && (x.taskId === task.id || x.title === task.title));
+      const alreadyDone = taskDoneFor(task, memberId, doneDate);
       if (alreadyDone) {
-        showToast('Это дело уже отмечено выполненным на выбранную дату.');
+        showToast(taskCompletionPolicy(task) === 'per-member'
+          ? 'Это дело уже отмечено для выбранного участника.'
+          : 'Это дело уже отмечено выполненным на выбранную дату.');
         return;
       }
       state.completed.unshift({ id: Date.now(), taskId: task.id, title: task.title, area: task.area, points: task.points, memberId, date: doneDate, updatedAt: new Date().toISOString() });
@@ -1581,7 +1602,7 @@
           <button class="primary-action" id="addCustomTask" style="margin-top:8px">Добавить</button>
         </div>` : ''}
         ${filtered.map(task => {
-          const done = state.completed.find(x => x.date === today() && (x.taskId === task.id || x.title === task.title));
+          const done = taskDoneFor(task, state.active);
           return `<button class="card ${done ? 'done' : ''}" data-task="${task.id}">
           <img class="task-card-icon" src="${taskIconSrc(task)}" alt="">
           <div class="card-main"><div class="task-title">${task.title}</div><div class="meta">${done ? `сделано сегодня: ${member(done.memberId).name}` : `${task.area} · ${task.cadence}`}</div></div>
@@ -1850,7 +1871,7 @@
           ${state.selectedZone ? '<button class="small-btn" id="clearFilter">все</button>' : ''}
         </div>
         ${filtered.map(task => {
-          const done = state.completed.find(x => x.date === today() && (x.taskId === task.id || x.title === task.title));
+          const done = taskDoneFor(task, state.active);
           return `<button class="card ${done ? 'done' : ''}" data-task="${task.id}">
             <img class="task-card-icon" src="${taskIconSrc(task)}" alt="">
             <div class="card-main"><div class="task-title">${task.title}</div><div class="meta">${done ? `сделано сегодня: ${member(done.memberId).name}` : `${task.area} · ${task.cadence}`}</div></div>

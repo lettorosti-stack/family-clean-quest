@@ -35,6 +35,13 @@ if (!html.includes('id="historyAreaPicker"') || !html.includes('data-history-are
 if (!html.includes('.filter(task => task.area === historyAreaSelection)')) {
   throw new Error('Manual history tasks are not filtered by the selected room');
 }
+if (!html.includes("repeatableDailyTaskLimits = new Map([['kitchen-dishes', 4]])")) {
+  throw new Error('Four-times-daily dish washing completion policy is missing');
+}
+if (!html.includes("perMemberDailyTaskIds = new Set(['garden-water', 'garden-weed'])")
+  || !html.includes("task?.area === 'помощь бабушке и дедушке'")) {
+  throw new Error('Per-member shared task completion policy is missing');
+}
 if (!html.includes('id="historyTaskOptions"') || !html.includes('historyTaskOptions.scrollTop = historyTaskScrollTop')) {
   throw new Error('Manual history picker does not preserve its scroll position');
 }
