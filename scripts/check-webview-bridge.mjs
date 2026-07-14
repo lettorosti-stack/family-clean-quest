@@ -43,6 +43,8 @@ localStorage.setItem('cleanQuestPreview', JSON.stringify({
 }));
 let deferRemoteState = true;
 context.window.shouldDeferFamilySyncApply = () => deferRemoteState;
+let liveState = null;
+context.window.setFamilyStateFromNative = (value) => { liveState = value; };
 listeners.document.message({
   data: JSON.stringify({
     type: 'remoteFamilyState',
@@ -62,6 +64,9 @@ const mergedState = JSON.parse(localStorage.getItem('cleanQuestPreview'));
 assert.equal(mergedState.avatars.diana, 'new-avatar');
 assert.equal(mergedState.avatarUpdatedAt.diana, '2026-07-13T11:00:00.000Z');
 assert.deepEqual(mergedState.completed, []);
+assert.equal(liveState.avatars.diana, 'new-avatar');
+assert.equal(liveState.completed.length, 0);
+assert.match(source, /setFamilyStateFromNative\(next\)/);
 assert.match(source, /serialized === lastAppliedRemoteSerializedRef\.current/);
 assert.match(source, /type: 'requestForceSync'/);
 assert.match(source, /requestForcedSyncFromWebView\('startup'\)/);

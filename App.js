@@ -131,7 +131,11 @@ const bridgeScript = `
       selectedZone: current.selectedZone || null
     });
     writeState(next);
-    if (typeof window.render === 'function') window.render();
+    if (typeof window.setFamilyStateFromNative === 'function') {
+      window.setFamilyStateFromNative(next);
+    } else if (typeof window.render === 'function') {
+      window.render();
+    }
     if (window.ReactNativeWebView) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'remoteApplied' }));
     }
