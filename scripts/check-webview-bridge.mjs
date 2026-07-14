@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../App.js', import.meta.url), 'utf8');
+const firebaseSyncSource = await readFile(new URL('../src/firebaseSync.js', import.meta.url), 'utf8');
 const match = source.match(/const bridgeScript = `([\s\S]*?)`;\s*const diagnosticsScript/);
 assert.ok(match, 'bridgeScript was not found in App.js');
 
@@ -62,5 +63,9 @@ assert.equal(mergedState.avatars.diana, 'new-avatar');
 assert.equal(mergedState.avatarUpdatedAt.diana, '2026-07-13T11:00:00.000Z');
 assert.deepEqual(mergedState.completed, []);
 assert.match(source, /serialized === lastAppliedRemoteSerializedRef\.current/);
+assert.match(firebaseSyncSource, /firebase\/firestore\/lite/);
+assert.match(firebaseSyncSource, /experimentalAutoDetectLongPolling: true/);
+assert.doesNotMatch(firebaseSyncSource, /experimentalForceLongPolling: true/);
+assert.match(firebaseSyncSource, /retryTimer = setTimeout\(connect, delay\)/);
 
-console.log('WebView bridge defers updates during selection and applies authoritative remote state.');
+console.log('WebView bridge applies authoritative state; Firestore uses REST refresh and listener retry.');
