@@ -85,6 +85,8 @@
     .empty { text-align: center; color: #64748b; font-weight: 800; padding: 24px 0; }
     .reward-title { margin-top: 16px; }
     .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 10px 0 14px; }
+    .weekday { min-height: 22px; display: grid; place-items: center; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+    .day-spacer { aspect-ratio: 1; }
     .day { aspect-ratio: 1; border-radius: 8px; background: #fff; border: 1px solid #e2e8f0; color: #0f172a; font-size: 12px; font-weight: 900; display: grid; place-items: center; position: relative; }
     .day.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
     .day.today { box-shadow: inset 0 0 0 2px #f59e0b; }
@@ -1177,6 +1179,7 @@
       const year = base.getFullYear();
       const month = base.getMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
       const days = Array.from({ length: daysInMonth }, (_, index) => {
         const day = index + 1;
         const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -1187,6 +1190,8 @@
       return `
         <div class="section"><img class="nav-icon big" src="assets/icons/calendar-transparent.png" alt=""><div><h2>Календарь дел</h2><div class="sub">Выберите дату, чтобы увидеть, кто и что сделал.</div></div></div>
         <div class="calendar-grid">
+          ${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => `<div class="weekday">${day}</div>`).join('')}
+          ${Array.from({ length: firstDayOffset }, () => '<div class="day-spacer" aria-hidden="true"></div>').join('')}
           ${days.map(item => `<button class="day ${item.date === state.selectedDate ? 'active' : ''}" data-date="${item.date}">${item.day}${item.count ? `<span class="count">${item.count}</span>` : ''}</button>`).join('')}
         </div>
         <div class="date-title">${state.selectedDate}</div>
@@ -1431,6 +1436,7 @@
       const year = base.getFullYear();
       const month = base.getMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayOffset = (new Date(year, month, 1).getDay() + 6) % 7;
       const todayDate = today();
       const days = Array.from({ length: daysInMonth }, (_, index) => {
         const day = index + 1;
@@ -1450,6 +1456,8 @@
       return `
         <div class="section"><img class="nav-icon big" src="assets/icons/calendar-transparent.png" alt=""><div><h2>Календарь дел</h2><div class="sub">Сегодня выделено желтой рамкой. Мама может отметить дело за выбранную дату и выбрать исполнителя.</div></div></div>
         <div class="calendar-grid">
+          ${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => `<div class="weekday">${day}</div>`).join('')}
+          ${Array.from({ length: firstDayOffset }, () => '<div class="day-spacer" aria-hidden="true"></div>').join('')}
           ${days.map(item => `<button class="day ${item.date === state.selectedDate ? 'active' : ''} ${item.date === todayDate ? 'today' : ''}" data-date="${item.date}">${item.day}${item.count ? `<span class="count">${item.count}</span>` : ''}</button>`).join('')}
         </div>
         <div class="date-title">${state.selectedDate}${state.selectedDate === todayDate ? ' · сегодня' : ''}</div>

@@ -231,6 +231,7 @@ export default function App() {
   const lastPublishedRef = useRef('');
   const lastSharedStateRef = useRef(null);
   const lastRemoteStateRef = useRef(null);
+  const lastAppliedRemoteSerializedRef = useRef('');
   const applyingRemoteRef = useRef(false);
   const joiningFamilyRef = useRef(false);
   const replaceNextRemoteRef = useRef(false);
@@ -265,6 +266,12 @@ export default function App() {
     if (!remoteState || !syncRef.current) return;
     const shared = syncRef.current.toSharedFamilyState(remoteState, familyCode);
     lastRemoteStateRef.current = { value: shared, replace };
+    const serialized = JSON.stringify(shared);
+    if (serialized === lastAppliedRemoteSerializedRef.current) {
+      setSyncStatus('connected');
+      return;
+    }
+    lastAppliedRemoteSerializedRef.current = serialized;
     applyingRemoteRef.current = true;
     webViewRef.current?.postMessage(JSON.stringify({
       type: 'remoteFamilyState',
@@ -354,7 +361,7 @@ export default function App() {
           setSyncStatus('waiting');
           return;
         }
-        applyRemoteFamilyState(remoteState, replaceNextRemoteRef.current);
+        applyRemoteFamilyState(remoteState, true);
         replaceNextRemoteRef.current = false;
       },
       (error) => {
@@ -371,7 +378,7 @@ export default function App() {
     const refreshFromCloud = () => {
       syncRef.current.getFamilyState(familyCode)
         .then((remoteState) => {
-          if (!cancelled) applyRemoteFamilyState(remoteState, false);
+          if (!cancelled) applyRemoteFamilyState(remoteState, true);
         })
         .catch((error) => {
           if (!cancelled) pushDiagnostic(`Firebase polling refresh: ${error?.message ?? error}`);
@@ -390,7 +397,7 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active' && familyCode) {
         syncRef.current.getFamilyState(familyCode)
-          .then((remoteState) => applyRemoteFamilyState(remoteState, false))
+          .then((remoteState) => applyRemoteFamilyState(remoteState, true))
           .catch((error) => {
             pushDiagnostic(`Firebase foreground refresh: ${error?.message ?? error}`);
           });
@@ -417,6 +424,7 @@ export default function App() {
     if (action === 'disconnect') {
       await AsyncStorage.removeItem(FAMILY_CODE_STORAGE_KEY);
       lastRemoteStateRef.current = null;
+      lastAppliedRemoteSerializedRef.current = '';
       replaceNextRemoteRef.current = false;
       setFamilyCode('');
       setSyncStatus('disconnected');
@@ -460,6 +468,7 @@ export default function App() {
       setSyncStatus('connecting');
       if (!(await syncRef.current.familyExists(code))) throw new Error('Семья с таким кодом не найдена');
       lastRemoteStateRef.current = null;
+      lastAppliedRemoteSerializedRef.current = '';
       joiningFamilyRef.current = true;
       replaceNextRemoteRef.current = true;
       await AsyncStorage.setItem(FAMILY_CODE_STORAGE_KEY, code);
@@ -549,7 +558,7 @@ export default function App() {
     })
       .then(() => syncRef.current.getFamilyState(familyCode))
       .then((remoteState) => {
-        if (remoteState) applyRemoteFamilyState(remoteState, false);
+        if (remoteState) applyRemoteFamilyState(remoteState, true);
         if (isForceSync) {
           webViewRef.current?.postMessage(JSON.stringify({
             type: 'syncStatus',
