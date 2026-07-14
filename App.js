@@ -1,5 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { AppState, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
@@ -45,11 +45,11 @@ const bridgeScript = `
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
   }
 
-  function postState(reason) {
+  function postState(reason, messageType) {
     var value = readState();
     if (!value || !window.ReactNativeWebView) return;
     window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: 'state',
+      type: messageType || 'state',
       reason: reason || 'change',
       value: value
     }));
@@ -162,6 +162,9 @@ const bridgeScript = `
       if (message && message.type === 'syncStatus' && message.text && typeof window.showToast === 'function') {
         window.showToast(message.text);
       }
+      if (message && message.type === 'requestForceSync') {
+        postState(message.reason || 'lifecycle', 'forceSync');
+      }
     } catch (error) {}
   }
 
@@ -255,6 +258,7 @@ export default function App() {
   const [deviceId, setDeviceId] = useState('');
   const [syncReady, setSyncReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState('disconnected');
+  const [lastSyncAt, setLastSyncAt] = useState('');
 
   const webViewSource = useMemo(
     () => {
@@ -279,6 +283,8 @@ export default function App() {
     const shared = syncRef.current.toSharedFamilyState(remoteState, familyCode);
     lastRemoteStateRef.current = { value: shared, replace };
     const serialized = JSON.stringify(shared);
+    lastSharedStateRef.current = shared;
+    lastPublishedRef.current = serialized;
     if (serialized === lastAppliedRemoteSerializedRef.current) {
       setSyncStatus('connected');
       return;
@@ -327,9 +333,25 @@ export default function App() {
         configured: isFirebaseConfigured(),
         familyCode,
         status: syncStatus,
+        lastSyncAt,
       },
     }));
-  }, [familyCode, syncStatus]);
+  }, [familyCode, lastSyncAt, syncStatus]);
+
+  const requestForcedSyncFromWebView = useCallback((reason) => {
+    if (!familyCode || !isFirebaseConfigured() || !syncRef.current) return;
+    setSyncStatus('syncing');
+    webViewRef.current?.postMessage(JSON.stringify({
+      type: 'requestForceSync',
+      reason,
+    }));
+  }, [familyCode]);
+
+  useEffect(() => {
+    if (!syncReady || !familyCode || !htmlFileUri) return undefined;
+    const timer = setTimeout(() => requestForcedSyncFromWebView('startup'), 1500);
+    return () => clearTimeout(timer);
+  }, [familyCode, htmlFileUri, requestForcedSyncFromWebView, syncReady]);
 
   useEffect(() => {
     if (diagnosticMode === 'webview-minimal' || diagnosticMode === 'rn-root') return undefined;
@@ -408,27 +430,71 @@ export default function App() {
     if (!isFirebaseConfigured() || !syncRef.current) return undefined;
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active' && familyCode) {
+        setSyncStatus('syncing');
         syncRef.current.getFamilyState(familyCode)
-          .then((remoteState) => applyRemoteFamilyState(remoteState, true))
+          .then((remoteState) => {
+            applyRemoteFamilyState(remoteState, true);
+            setTimeout(() => requestForcedSyncFromWebView('foreground'), 1000);
+          })
           .catch((error) => {
+            setSyncStatus('error');
             pushDiagnostic(`Firebase foreground refresh: ${error?.message ?? error}`);
           });
         return;
       }
       if (nextState !== 'background' && nextState !== 'inactive') return;
-      if (!lastSharedStateRef.current) return;
       if (!familyCode) return;
+      setSyncStatus('syncing');
+      if (!lastSharedStateRef.current) {
+        requestForcedSyncFromWebView('background');
+        return;
+      }
       syncRef.current.publishFamilyState(familyCode, lastSharedStateRef.current, {
         memberId: lastSharedStateRef.current.active,
         deviceId,
       })
+        .then(() => {
+          setLastSyncAt(new Date().toISOString());
+          setSyncStatus('connected');
+        })
         .catch((error) => {
+          setSyncStatus('error');
           pushDiagnostic(`Firebase background publish: ${error?.message ?? error}`);
           console.warn('Family sync background publish failed', error);
         });
     });
     return () => subscription.remove();
-  }, [applyRemoteFamilyState, deviceId, familyCode, pushDiagnostic]);
+  }, [applyRemoteFamilyState, deviceId, familyCode, pushDiagnostic, requestForcedSyncFromWebView]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const shared = lastSharedStateRef.current;
+      if (!familyCode || !shared || !syncRef.current || !isFirebaseConfigured()) return false;
+      let exited = false;
+      const finishExit = () => {
+        if (exited) return;
+        exited = true;
+        BackHandler.exitApp();
+      };
+      setSyncStatus('syncing');
+      syncRef.current.publishFamilyState(familyCode, shared, {
+        memberId: shared.active,
+        deviceId,
+      })
+        .then(() => {
+          setLastSyncAt(new Date().toISOString());
+          setSyncStatus('connected');
+        })
+        .catch((error) => {
+          setSyncStatus('error');
+          pushDiagnostic(`Firebase exit publish: ${error?.message ?? error}`);
+        })
+        .finally(finishExit);
+      setTimeout(finishExit, 2200);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [deviceId, familyCode, pushDiagnostic]);
 
   const handleSyncCommand = useCallback(async (message) => {
     if (!isFirebaseConfigured() || !syncRef.current) throw new Error('Firebase не настроен');
@@ -563,6 +629,7 @@ export default function App() {
     const serialized = JSON.stringify(shared);
     if (serialized === lastPublishedRef.current && !isForceSync) return;
     lastPublishedRef.current = serialized;
+    setSyncStatus('syncing');
 
     syncRef.current.publishFamilyState(familyCode, shared, {
       memberId: message.value.active,
@@ -571,6 +638,8 @@ export default function App() {
       .then(() => syncRef.current.getFamilyState(familyCode))
       .then((remoteState) => {
         if (remoteState) applyRemoteFamilyState(remoteState, true);
+        setLastSyncAt(new Date().toISOString());
+        setSyncStatus('connected');
         if (isForceSync) {
           webViewRef.current?.postMessage(JSON.stringify({
             type: 'syncStatus',
@@ -579,6 +648,7 @@ export default function App() {
         }
       })
       .catch((error) => {
+        setSyncStatus('error');
         lastPublishedRef.current = '';
         pushDiagnostic(`Firebase publish: ${error?.message ?? error}`);
         console.warn('Family sync publish failed', error);
@@ -648,6 +718,7 @@ export default function App() {
                   configured: isFirebaseConfigured(),
                   familyCode,
                   status: syncStatus,
+                  lastSyncAt,
                 },
               }));
               if (lastRemoteStateRef.current) {

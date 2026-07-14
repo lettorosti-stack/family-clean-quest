@@ -26,6 +26,9 @@ quoteAssets.forEach((asset) => {
 if (!html.includes('id="dailyQuoteButton"') || !html.includes('id="quoteModal"')) {
   throw new Error('Daily quote controls are missing');
 }
+if (!html.includes('id="topSyncStatus"') || !html.includes("familySync.status === 'syncing'")) {
+  throw new Error('Visible synchronization progress indicator is missing');
+}
 if (!html.includes('id="historyTaskPicker"') || !html.includes('data-history-task-option')) {
   throw new Error('Stable manual history picker is missing');
 }

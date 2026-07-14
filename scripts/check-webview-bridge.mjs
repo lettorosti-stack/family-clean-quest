@@ -63,9 +63,17 @@ assert.equal(mergedState.avatars.diana, 'new-avatar');
 assert.equal(mergedState.avatarUpdatedAt.diana, '2026-07-13T11:00:00.000Z');
 assert.deepEqual(mergedState.completed, []);
 assert.match(source, /serialized === lastAppliedRemoteSerializedRef\.current/);
+assert.match(source, /type: 'requestForceSync'/);
+assert.match(source, /requestForcedSyncFromWebView\('startup'\)/);
+assert.match(source, /requestForcedSyncFromWebView\('foreground'\)/);
+assert.match(source, /Firebase background publish/);
+assert.match(source, /BackHandler\.addEventListener\('hardwareBackPress'/);
 assert.match(firebaseSyncSource, /firebase\/firestore\/lite/);
 assert.match(firebaseSyncSource, /experimentalAutoDetectLongPolling: true/);
 assert.doesNotMatch(firebaseSyncSource, /experimentalForceLongPolling: true/);
 assert.match(firebaseSyncSource, /retryTimer = setTimeout\(connect, delay\)/);
+assert.match(firebaseSyncSource, /let publishQueue = Promise\.resolve\(\)/);
+assert.match(firebaseSyncSource, /message\.includes\('stored version'\)/);
+assert.match(firebaseSyncSource, /\{ maxAttempts: 8 \}/);
 
-console.log('WebView bridge applies authoritative state; Firestore uses REST refresh and listener retry.');
+console.log('WebView bridge applies authoritative state; Firestore retries reads, listeners, and contended writes.');
