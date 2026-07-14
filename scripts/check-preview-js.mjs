@@ -29,6 +29,12 @@ if (!html.includes('id="dailyQuoteButton"') || !html.includes('id="quoteModal"')
 if (!html.includes('id="historyTaskPicker"') || !html.includes('data-history-task-option')) {
   throw new Error('Stable manual history picker is missing');
 }
+if (!html.includes('id="historyAreaPicker"') || !html.includes('data-history-area-option')) {
+  throw new Error('Manual history room picker is missing');
+}
+if (!html.includes('.filter(task => task.area === historyAreaSelection)')) {
+  throw new Error('Manual history tasks are not filtered by the selected room');
+}
 if (!html.includes('id="historyTaskOptions"') || !html.includes('historyTaskOptions.scrollTop = historyTaskScrollTop')) {
   throw new Error('Manual history picker does not preserve its scroll position');
 }
