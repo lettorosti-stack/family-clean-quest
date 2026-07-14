@@ -67,5 +67,8 @@ assert.match(firebaseSyncSource, /firebase\/firestore\/lite/);
 assert.match(firebaseSyncSource, /experimentalAutoDetectLongPolling: true/);
 assert.doesNotMatch(firebaseSyncSource, /experimentalForceLongPolling: true/);
 assert.match(firebaseSyncSource, /retryTimer = setTimeout\(connect, delay\)/);
+assert.match(firebaseSyncSource, /let publishQueue = Promise\.resolve\(\)/);
+assert.match(firebaseSyncSource, /message\.includes\('stored version'\)/);
+assert.match(firebaseSyncSource, /\{ maxAttempts: 8 \}/);
 
-console.log('WebView bridge applies authoritative state; Firestore uses REST refresh and listener retry.');
+console.log('WebView bridge applies authoritative state; Firestore retries reads, listeners, and contended writes.');

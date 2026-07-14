@@ -21,6 +21,7 @@ const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
 let firestoreInstance = null;
 let firestoreLiteInstance = null;
+let publishQueue = Promise.resolve();
 
 export function normalizeFamilyCode(value) {
   return String(value ?? '')
@@ -245,22 +246,47 @@ export function subscribeFamilyState(familyCode, onChange, onError) {
   };
 }
 
-export async function publishFamilyState(familyCode, state, meta = {}) {
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function isRetryablePublishError(error) {
+  const code = String(error?.code ?? '').replace('firestore/', '').toLowerCase();
+  const message = String(error?.message ?? '').toLowerCase();
+  return ['aborted', 'deadline-exceeded', 'unavailable'].includes(code)
+    || message.includes('stored version')
+    || message.includes('required base version')
+    || message.includes('contention');
+}
+
+async function publishFamilyStateWithRetry(familyCode, state, meta = {}) {
   if (!isFirebaseConfigured()) throw new Error('Firebase не настроен');
   const normalized = normalizeFamilyCode(familyCode);
   if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
   const user = await ensureAnonymousAuth();
   const reference = getFamilyDoc(normalized);
-  await runTransaction(getFirestoreDb(), async (transaction) => {
-    const snapshot = await transaction.get(reference);
-    const remote = snapshot.exists() ? snapshot.data() : {};
-    const merged = mergeFamilyState(remote, toSharedFamilyState(state, normalized));
-    transaction.set(reference, {
-      ...toSharedFamilyState(merged, normalized),
-      createdAt: remote.createdAt ?? serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      updatedBy: meta.memberId ?? 'unknown',
-      updatedByDevice: meta.deviceId ?? user?.uid ?? 'unknown',
-    });
-  });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await runTransaction(getFirestoreDb(), async (transaction) => {
+        const snapshot = await transaction.get(reference);
+        const remote = snapshot.exists() ? snapshot.data() : {};
+        const merged = mergeFamilyState(remote, toSharedFamilyState(state, normalized));
+        transaction.set(reference, {
+          ...toSharedFamilyState(merged, normalized),
+          createdAt: remote.createdAt ?? serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          updatedBy: meta.memberId ?? 'unknown',
+          updatedByDevice: meta.deviceId ?? user?.uid ?? 'unknown',
+        });
+      }, { maxAttempts: 8 });
+      return;
+    } catch (error) {
+      if (!isRetryablePublishError(error) || attempt === 3) throw error;
+      await wait((300 * (2 ** attempt)) + Math.floor(Math.random() * 250));
+    }
+  }
+}
+
+export function publishFamilyState(familyCode, state, meta = {}) {
+  const operation = publishQueue.then(() => publishFamilyStateWithRetry(familyCode, state, meta));
+  publishQueue = operation.catch(() => undefined);
+  return operation;
 }
