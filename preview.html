@@ -684,6 +684,8 @@
     let historyMemberPickerOpen = false;
     let historyTaskSelection = '';
     let historyMemberSelection = '';
+    let historyTaskScrollTop = 0;
+    let historyMemberScrollTop = 0;
     state.selectedDate = state.selectedDate || today();
     state.rewardDate = state.rewardDate || today();
     state.deliveryDate = state.deliveryDate || today();
@@ -703,8 +705,14 @@
     let familySync = window.__familySyncConfig || { configured: false, familyCode: '', status: 'disconnected' };
     window.setFamilySyncConfig = function(nextConfig) {
       familySync = { ...familySync, ...(nextConfig || {}) };
-      if (typeof render === 'function') render();
+      if (!historyTaskPickerOpen && !historyMemberPickerOpen && typeof render === 'function') render();
     };
+    window.shouldDeferFamilySyncApply = function() {
+      return historyTaskPickerOpen || historyMemberPickerOpen;
+    };
+    function flushDeferredFamilySync() {
+      setTimeout(() => window.__flushPendingFamilyState?.(), 0);
+    }
 
     function today() { return new Date().toISOString().slice(0, 10); }
     function quoteForToday() {
@@ -873,8 +881,13 @@
     }
     function setTab(tab) {
       state.tab = tab;
+      if (tab !== 'history') {
+        historyTaskPickerOpen = false;
+        historyMemberPickerOpen = false;
+      }
       save();
       render();
+      flushDeferredFamilySync();
     }
     function zoneStatus(zone) {
       const zoneTasks = allTasks().filter(t => isTaskAvailable(t) && t.area.includes(zone.match));
@@ -1596,11 +1609,11 @@
         <div class="form-grid wide">
           <div class="manual-picker">
             <button class="manual-picker-button" id="historyTaskPicker">${selectedManualTask ? `${selectedManualTask.title} · ${selectedManualTask.points} б.` : 'Выберите задачу'}</button>
-            ${historyTaskPickerOpen ? `<div class="manual-picker-options">${manualTasks.map(task => `<button class="manual-picker-option ${task.id === historyTaskSelection ? 'selected' : ''}" data-history-task-option="${task.id}">${task.title} · ${task.points} б.</button>`).join('')}</div>` : ''}
+            ${historyTaskPickerOpen ? `<div class="manual-picker-options" id="historyTaskOptions">${manualTasks.map(task => `<button class="manual-picker-option ${task.id === historyTaskSelection ? 'selected' : ''}" data-history-task-option="${task.id}">${task.title} · ${task.points} б.</button>`).join('')}</div>` : ''}
           </div>
           <div class="manual-picker">
             <button class="manual-picker-button" id="historyMemberPicker">${selectedManualMember?.name || 'Выберите исполнителя'}</button>
-            ${historyMemberPickerOpen ? `<div class="manual-picker-options">${members.map(item => `<button class="manual-picker-option ${item.id === historyMemberSelection ? 'selected' : ''}" data-history-member-option="${item.id}">${item.name}</button>`).join('')}</div>` : ''}
+            ${historyMemberPickerOpen ? `<div class="manual-picker-options" id="historyMemberOptions">${members.map(item => `<button class="manual-picker-option ${item.id === historyMemberSelection ? 'selected' : ''}" data-history-member-option="${item.id}">${item.name}</button>`).join('')}</div>` : ''}
           </div>
         </div>
         <button class="primary-action" id="addHistoryDone" style="margin-top:8px">Отметить на выбранную дату</button>
@@ -1635,18 +1648,31 @@
         historyTaskPickerOpen = !historyTaskPickerOpen;
         historyMemberPickerOpen = false;
         render();
+        flushDeferredFamilySync();
       };
       const historyMemberPicker = document.getElementById('historyMemberPicker');
       if (historyMemberPicker) historyMemberPicker.onclick = () => {
         historyMemberPickerOpen = !historyMemberPickerOpen;
         historyTaskPickerOpen = false;
         render();
+        flushDeferredFamilySync();
       };
+      const historyTaskOptions = document.getElementById('historyTaskOptions');
+      if (historyTaskOptions) {
+        historyTaskOptions.scrollTop = historyTaskScrollTop;
+        historyTaskOptions.onscroll = () => { historyTaskScrollTop = historyTaskOptions.scrollTop; };
+      }
+      const historyMemberOptions = document.getElementById('historyMemberOptions');
+      if (historyMemberOptions) {
+        historyMemberOptions.scrollTop = historyMemberScrollTop;
+        historyMemberOptions.onscroll = () => { historyMemberScrollTop = historyMemberOptions.scrollTop; };
+      }
       document.querySelectorAll('[data-history-task-option]').forEach(btn => {
         btn.onclick = () => {
           historyTaskSelection = btn.dataset.historyTaskOption;
           historyTaskPickerOpen = false;
           render();
+          flushDeferredFamilySync();
         };
       });
       document.querySelectorAll('[data-history-member-option]').forEach(btn => {
@@ -1654,6 +1680,7 @@
           historyMemberSelection = btn.dataset.historyMemberOption;
           historyMemberPickerOpen = false;
           render();
+          flushDeferredFamilySync();
         };
       });
     };

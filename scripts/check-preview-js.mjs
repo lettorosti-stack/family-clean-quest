@@ -29,6 +29,12 @@ if (!html.includes('id="dailyQuoteButton"') || !html.includes('id="quoteModal"')
 if (!html.includes('id="historyTaskPicker"') || !html.includes('data-history-task-option')) {
   throw new Error('Stable manual history picker is missing');
 }
+if (!html.includes('id="historyTaskOptions"') || !html.includes('historyTaskOptions.scrollTop = historyTaskScrollTop')) {
+  throw new Error('Manual history picker does not preserve its scroll position');
+}
+if (!html.includes('window.shouldDeferFamilySyncApply')) {
+  throw new Error('Manual history picker does not defer background sync rendering');
+}
 if (html.includes('<select class="select-input" id="historyTask"')) {
   throw new Error('Native history task select must not be used in Android WebView');
 }

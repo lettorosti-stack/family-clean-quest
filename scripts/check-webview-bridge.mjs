@@ -40,6 +40,8 @@ localStorage.setItem('cleanQuestPreview', JSON.stringify({
   avatarUpdatedAt: { diana: '2026-07-13T12:00:00.000Z' },
   completed: [{ id: 1, title: 'stale local task' }],
 }));
+let deferRemoteState = true;
+context.window.shouldDeferFamilySyncApply = () => deferRemoteState;
 listeners.document.message({
   data: JSON.stringify({
     type: 'remoteFamilyState',
@@ -51,10 +53,14 @@ listeners.document.message({
     },
   }),
 });
+const deferredState = JSON.parse(localStorage.getItem('cleanQuestPreview'));
+assert.equal(deferredState.avatars.diana, 'old-avatar');
+deferRemoteState = false;
+context.window.__flushPendingFamilyState();
 const mergedState = JSON.parse(localStorage.getItem('cleanQuestPreview'));
 assert.equal(mergedState.avatars.diana, 'new-avatar');
 assert.equal(mergedState.avatarUpdatedAt.diana, '2026-07-13T11:00:00.000Z');
 assert.deepEqual(mergedState.completed, []);
 assert.match(source, /serialized === lastAppliedRemoteSerializedRef\.current/);
 
-console.log('WebView bridge accepts Android messages and authoritative remote state.');
+console.log('WebView bridge defers updates during selection and applies authoritative remote state.');
