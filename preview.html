@@ -113,6 +113,11 @@
     .approve { background: #dcfce7; color: #047857; }
     .reject { background: #ffe4e6; color: #be123c; }
     .top-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+    .sync-control { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .sync-indicator { min-height: 12px; max-width: 110px; color: #64748b; font-size: 9px; font-weight: 800; line-height: 1.1; text-align: center; }
+    .sync-indicator.syncing { color: #2563eb; }
+    .sync-indicator.error { color: #dc2626; }
+    .sync-btn:disabled { opacity: .7; cursor: wait; }
     .logout, .sync-btn { height: 34px; border-radius: 17px; background: #f1f5f9; color: #334155; font-size: 12px; font-weight: 900; padding: 0 12px; }
     .sync-btn { background: #ecfeff; color: #155e75; }
     .login-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; box-shadow: 0 8px 22px rgba(15, 23, 42, .06); }
@@ -173,7 +178,7 @@
           <h1>Семейные дела</h1>
         </div>
         <div class="top-actions">
-          <button class="sync-btn" id="topSync">Синхр.</button>
+          <div class="sync-control"><button class="sync-btn" id="topSync">Синхр.</button><div class="sync-indicator" id="topSyncStatus">не запускалась</div></div>
           <button class="logout" id="topLogout">Выйти</button>
         </div>
       </div>
@@ -708,6 +713,7 @@
     let familySync = window.__familySyncConfig || { configured: false, familyCode: '', status: 'disconnected' };
     window.setFamilySyncConfig = function(nextConfig) {
       familySync = { ...familySync, ...(nextConfig || {}) };
+      updateTopSyncStatus();
       if (!historyAreaPickerOpen && !historyTaskPickerOpen && !historyMemberPickerOpen && typeof render === 'function') render();
     };
     window.shouldDeferFamilySyncApply = function() {
@@ -798,15 +804,32 @@
     }
     function familySyncStatusText() {
       if (!familySync.configured) return 'Firebase не настроен';
+      if (familySync.status === 'syncing') return 'Синхронизация…';
       if (familySync.status === 'connected') return 'Подключено · изменения синхронизируются автоматически';
       if (familySync.status === 'connecting') return 'Подключение…';
       if (familySync.status === 'waiting') return 'Ожидаем первые данные семьи…';
       if (familySync.status === 'error') return 'Ошибка подключения';
       return 'Это устройство пока не подключено';
     }
+    function updateTopSyncStatus() {
+      const button = document.getElementById('topSync');
+      const indicator = document.getElementById('topSyncStatus');
+      if (!button || !indicator) return;
+      const syncing = familySync.status === 'syncing';
+      button.disabled = syncing;
+      button.textContent = syncing ? 'Синхр…' : 'Синхр.';
+      indicator.className = `sync-indicator${syncing ? ' syncing' : familySync.status === 'error' ? ' error' : ''}`;
+      if (syncing) indicator.textContent = 'идёт…';
+      else if (familySync.status === 'error') indicator.textContent = 'ошибка · повторить';
+      else if (familySync.lastSyncAt) indicator.textContent = `готово ${new Date(familySync.lastSyncAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
+      else if (familySync.status === 'connected') indicator.textContent = 'готово';
+      else indicator.textContent = 'не запускалась';
+    }
     function requestSync() {
       save();
       if (window.ReactNativeWebView) {
+        familySync.status = 'syncing';
+        updateTopSyncStatus();
         window.ReactNativeWebView.postMessage(JSON.stringify({
           type: 'forceSync',
           value: state
@@ -1432,6 +1455,7 @@
       if (topLogout) topLogout.onclick = logout;
       const topSync = document.getElementById('topSync');
       if (topSync) topSync.onclick = requestSync;
+      updateTopSyncStatus();
       const createFamilySyncBtn = document.getElementById('createFamilySync');
       if (createFamilySyncBtn) createFamilySyncBtn.onclick = createFamilySync;
       const joinFamilySyncBtn = document.getElementById('joinFamilySync');
