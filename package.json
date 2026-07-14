@@ -1,6 +1,6 @@
 {
   "name": "family-clean-quest",
-  "version": "1.1.12",
+  "version": "1.1.13",
   "main": "expo/AppEntry",
   "scripts": {
     "start": "expo start",
