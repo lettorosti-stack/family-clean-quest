@@ -2,13 +2,17 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
   doc,
-  getDoc,
   getDocFromServer,
   initializeFirestore,
   onSnapshot,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
+import {
+  doc as liteDoc,
+  getDoc as getLiteDoc,
+  getFirestore as getLiteFirestore,
+} from 'firebase/firestore/lite';
 import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 
 export { isFirebaseConfigured };
@@ -16,6 +20,7 @@ const FAMILY_CODE_LENGTH = 12;
 const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
 let firestoreInstance = null;
+let firestoreLiteInstance = null;
 
 export function normalizeFamilyCode(value) {
   return String(value ?? '')
@@ -43,17 +48,40 @@ function getFirebaseApp() {
 function getFirestoreDb() {
   if (!firestoreInstance) {
     firestoreInstance = initializeFirestore(getFirebaseApp(), {
-      experimentalForceLongPolling: true,
-      experimentalLongPollingOptions: { timeoutSeconds: 15 },
+      experimentalAutoDetectLongPolling: true,
+      experimentalLongPollingOptions: { timeoutSeconds: 25 },
     });
   }
   return firestoreInstance;
+}
+
+function getFirestoreLiteDb() {
+  if (!firestoreLiteInstance) firestoreLiteInstance = getLiteFirestore(getFirebaseApp());
+  return firestoreLiteInstance;
 }
 
 function getFamilyDoc(familyCode) {
   const normalized = normalizeFamilyCode(familyCode);
   if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
   return doc(getFirestoreDb(), 'families', normalized);
+}
+
+function getFamilyLiteDoc(familyCode) {
+  const normalized = normalizeFamilyCode(familyCode);
+  if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
+  return liteDoc(getFirestoreLiteDb(), 'families', normalized);
+}
+
+async function getFamilySnapshotFromServer(familyCode) {
+  try {
+    return await getLiteDoc(getFamilyLiteDoc(familyCode));
+  } catch {
+    try {
+      return await getDocFromServer(getFamilyDoc(familyCode));
+    } catch (streamError) {
+      throw streamError;
+    }
+  }
 }
 
 async function ensureAnonymousAuth() {
@@ -167,13 +195,13 @@ export function mergeFamilyState(localState, remoteState) {
 export async function familyExists(familyCode) {
   if (!isFirebaseConfigured()) return false;
   await ensureAnonymousAuth();
-  return (await getDoc(getFamilyDoc(familyCode))).exists();
+  return (await getFamilySnapshotFromServer(familyCode)).exists();
 }
 
 export async function getFamilyState(familyCode) {
   if (!isFirebaseConfigured()) return null;
   await ensureAnonymousAuth();
-  const snapshot = await getDocFromServer(getFamilyDoc(familyCode));
+  const snapshot = await getFamilySnapshotFromServer(familyCode);
   return snapshot.exists() ? snapshot.data() : null;
 }
 
@@ -181,18 +209,38 @@ export function subscribeFamilyState(familyCode, onChange, onError) {
   if (!isFirebaseConfigured() || !isValidFamilyCode(familyCode)) return () => {};
   let unsubscribe = () => {};
   let closed = false;
-  ensureAnonymousAuth()
-    .then(() => {
-      if (closed) return;
-      unsubscribe = onSnapshot(
-        getFamilyDoc(familyCode),
-        (snapshot) => onChange(snapshot.exists() ? snapshot.data() : null),
-        onError,
-      );
-    })
-    .catch((error) => onError?.(error));
+  let retryTimer = null;
+  let retryAttempt = 0;
+
+  const scheduleRetry = (error) => {
+    if (closed) return;
+    onError?.(error);
+    const delay = Math.min(30000, 1500 * (2 ** retryAttempt));
+    retryAttempt += 1;
+    retryTimer = setTimeout(connect, delay);
+  };
+
+  const connect = () => {
+    if (closed) return;
+    ensureAnonymousAuth()
+      .then(() => {
+        if (closed) return;
+        unsubscribe = onSnapshot(
+          getFamilyDoc(familyCode),
+          (snapshot) => {
+            retryAttempt = 0;
+            onChange(snapshot.exists() ? snapshot.data() : null);
+          },
+          scheduleRetry,
+        );
+      })
+      .catch(scheduleRetry);
+  };
+
+  connect();
   return () => {
     closed = true;
+    if (retryTimer) clearTimeout(retryTimer);
     unsubscribe();
   };
 }
