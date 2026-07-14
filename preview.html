@@ -710,6 +710,12 @@
     state.recoveryWord = state.recoveryWord || '';
     if (!('loginChoice' in state)) state.loginChoice = 'mom';
 
+    window.setFamilyStateFromNative = function(nextState) {
+      if (!nextState || typeof nextState !== 'object') return;
+      state = nextState;
+      if (typeof render === 'function') render();
+    };
+
     let familySync = window.__familySyncConfig || { configured: false, familyCode: '', status: 'disconnected' };
     window.setFamilySyncConfig = function(nextConfig) {
       familySync = { ...familySync, ...(nextConfig || {}) };
