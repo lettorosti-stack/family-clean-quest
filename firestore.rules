@@ -11,6 +11,17 @@ service cloud.firestore {
         && request.resource.data.familyId == familyId;
 
       allow delete: if false;
+
+      match /backups/{backupId} {
+        allow read: if request.auth != null
+          && familyId.matches('^[A-Z0-9]{12}$');
+
+        allow create, update: if request.auth != null
+          && familyId.matches('^[A-Z0-9]{12}$')
+          && request.resource.data.familyId == familyId;
+
+        allow delete: if false;
+      }
     }
   }
 }

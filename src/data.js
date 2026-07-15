@@ -102,10 +102,10 @@ export const tasks = [
   { id: 'upstairs-vacuum-clean', title: 'Робот-пылесос 2 этажа: вычистить контейнер, щетки и фильтр', area: '2 этаж - робот-пылесос', points: 3, cadence: '1 раз в неделю' },
   { id: 'garden-water', title: 'Полить грядки и цветники', area: 'огород', points: 1, cadence: 'ежедневно' },
   { id: 'garden-weed', title: 'Прополоть грядки или цветники', area: 'огород', points: 2, cadence: 'периодически' },
-  { id: 'lawn-mow', title: 'Газон: покосить траву', area: 'огород', points: 5, cadence: 'по мере роста травы' },
+  { id: 'lawn-mow', title: 'Газон: покосить траву', area: 'огород', points: 2, cadence: 'по мере роста травы' },
   { id: 'lawn-weed', title: 'Газон: прополка сорняков', area: 'огород', points: 3, cadence: 'периодически' },
   { id: 'garden-old-leaves', title: 'Огород: вынести старую листву за пределы участка', area: 'огород', points: 4, cadence: 'по необходимости' },
-  { id: 'front-lawn-mow', title: 'Перед участком: покосить траву', area: 'огород', points: 5, cadence: 'по мере роста травы' },
+  { id: 'front-lawn-mow', title: 'Перед участком: покосить траву', area: 'огород', points: 2, cadence: 'по мере роста травы' },
   { id: 'garden-harvest', title: 'Огород: собрать урожай или сухие цветы', area: 'огород', points: 2, cadence: 'по необходимости' },
   { id: 'garden-tools', title: 'Огород: убрать инвентарь и шланг', area: 'огород', points: 1, cadence: 'после работ' },
 ];

@@ -54,6 +54,17 @@ if (!html.includes('window.shouldDeferFamilySyncApply')) {
 if (!html.includes('window.setFamilyStateFromNative')) {
   throw new Error('Remote family state is not applied to the live preview state');
 }
+if (!html.includes('window.handleNativeBack') || !html.includes("state.tab = 'home'")) {
+  throw new Error('Android back navigation does not return to the previous app screen');
+}
+if (!html.includes('id="createFamilyBackup"') || !html.includes('id="restoreFamilyBackup"')) {
+  throw new Error('Family backup controls are missing');
+}
+if (!html.includes("id: 'lawn-mow', title: 'Газон: покосить траву', area: 'огород', points: 2")
+  || !html.includes("id: 'front-lawn-mow', title: 'Перед участком: покосить траву', area: 'огород', points: 2")
+  || !html.includes("id: 'kitchen-cook-baking', title: 'Кухня: приготовление еды - выпечка', area: '1 этаж - кухня', points: 3")) {
+  throw new Error('Updated mowing and baking points are missing');
+}
 if (html.includes('<select class="select-input" id="historyTask"')) {
   throw new Error('Native history task select must not be used in Android WebView');
 }
