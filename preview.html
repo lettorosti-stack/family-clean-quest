@@ -427,10 +427,10 @@
       { id: 'upstairs-vacuum-clean', title: 'Комната Дианы: робот-пылесос - вычистить контейнер, щетки и фильтр', area: '2 этаж - комната Дианы', points: 3, cadence: '1 раз в неделю' },
       { id: 'garden-water', title: 'Полить грядки и цветники', area: 'огород', points: 1, cadence: 'ежедневно' },
       { id: 'garden-weed', title: 'Прополоть грядки или цветники', area: 'огород', points: 2, cadence: 'периодически' },
-      { id: 'lawn-mow', title: 'Газон: покосить траву', area: 'огород', points: 5, cadence: 'по мере роста травы' },
+      { id: 'lawn-mow', title: 'Газон: покосить траву', area: 'огород', points: 2, cadence: 'по мере роста травы' },
       { id: 'lawn-weed', title: 'Газон: прополка сорняков', area: 'огород', points: 3, cadence: 'периодически' },
       { id: 'garden-old-leaves', title: 'Огород: вынести старую листву за пределы участка', area: 'огород', points: 4, cadence: 'по необходимости' },
-      { id: 'front-lawn-mow', title: 'Перед участком: покосить траву', area: 'огород', points: 5, cadence: 'по мере роста травы' },
+      { id: 'front-lawn-mow', title: 'Перед участком: покосить траву', area: 'огород', points: 2, cadence: 'по мере роста травы' },
       { id: 'garden-harvest', title: 'Огород: собрать урожай или сухие цветы', area: 'огород', points: 2, cadence: 'по необходимости' },
       { id: 'garden-tools', title: 'Огород: убрать инвентарь и шланг', area: 'огород', points: 1, cadence: 'после работ' },
       { id: 'garage-car-wash', title: 'Гараж: помыть машину', area: 'гараж', points: 5, cadence: '1 раз в неделю' }
@@ -808,6 +808,16 @@
     function disconnectFamilySync() {
       sendSyncCommand('disconnect');
     }
+    function createFamilyBackup() {
+      save();
+      sendSyncCommand('backup');
+      showToast('Создаем резервную копию…');
+    }
+    function restoreFamilyBackup() {
+      if (!window.confirm('Восстановить последнюю резервную копию? Текущие общие данные семьи будут заменены.')) return;
+      sendSyncCommand('restoreBackup');
+      showToast('Восстанавливаем резервную копию…');
+    }
     function familySyncStatusText() {
       if (!familySync.configured) return 'Firebase не настроен';
       if (familySync.status === 'syncing') return 'Синхронизация…';
@@ -1123,6 +1133,14 @@
           <div class="meta">Путь сохранен в настройках семьи. Автосинхронизация APK сейчас работает через встроенный облачный мост, а эту ссылку можно заменить для будущей Google Drive-интеграции.</div>
           <input class="text-input" id="cloudFolderUrl" value="${state.cloudFolderUrl || DEFAULT_CLOUD_FOLDER_URL}">
         </div>
+        ${familySync.familyCode ? `<div class="form-panel" style="margin-top:12px">
+          <div class="task-title">Резервные копии</div>
+          <div class="meta">Копии общих заданий, баллов, наград и аватарок хранятся отдельно в Firebase. Перед первой маминой синхронизацией каждого дня предыдущая серверная версия сохраняется автоматически.</div>
+          <div class="reward-grid" style="margin-top:10px">
+            <button class="small-btn" id="createFamilyBackup">Создать копию сейчас</button>
+            <button class="small-btn" id="restoreFamilyBackup">Восстановить последнюю</button>
+          </div>
+        </div>` : ''}
         <div class="form-panel" style="margin-top:12px">
           <div class="task-title">Кодовое слово мамы</div>
           <div class="meta">Оно потребуется для сброса маминого пароля, даже если приложение открыто на мамином телефоне.</div>
@@ -1143,6 +1161,29 @@
       document.getElementById('avatarEditorModal').classList.remove('show');
       document.getElementById('avatarEditorContent').innerHTML = '';
     }
+    window.handleNativeBack = function() {
+      const quoteModal = document.getElementById('quoteModal');
+      if (quoteModal?.classList.contains('show')) { closeDailyQuote(); return true; }
+      const avatarEditorModal = document.getElementById('avatarEditorModal');
+      if (avatarEditorModal?.classList.contains('show')) { closeAvatarEditor(); return true; }
+      const avatarModal = document.getElementById('avatarModal');
+      if (avatarModal?.classList.contains('show')) { closeAvatarPreview(); return true; }
+      if (historyAreaPickerOpen || historyTaskPickerOpen || historyMemberPickerOpen) {
+        historyAreaPickerOpen = false;
+        historyTaskPickerOpen = false;
+        historyMemberPickerOpen = false;
+        render();
+        flushDeferredFamilySync();
+        return true;
+      }
+      if (state.selectedZone || state.tab !== 'home') {
+        state.selectedZone = null;
+        state.tab = 'home';
+        save();
+        render();
+      }
+      return true;
+    };
     function removeReward(id) {
       if (member(state.active).role !== 'parent') {
         showToast('Удалять награды может только мама.');
@@ -1468,6 +1509,10 @@
       if (joinFamilySyncBtn) joinFamilySyncBtn.onclick = joinFamilySync;
       const disconnectFamilySyncBtn = document.getElementById('disconnectFamilySync');
       if (disconnectFamilySyncBtn) disconnectFamilySyncBtn.onclick = disconnectFamilySync;
+      const createFamilyBackupBtn = document.getElementById('createFamilyBackup');
+      if (createFamilyBackupBtn) createFamilyBackupBtn.onclick = createFamilyBackup;
+      const restoreFamilyBackupBtn = document.getElementById('restoreFamilyBackup');
+      if (restoreFamilyBackupBtn) restoreFamilyBackupBtn.onclick = restoreFamilyBackup;
       const familyCodeInput = document.getElementById('familyCodeInput');
       if (familyCodeInput) familyCodeInput.oninput = () => {
         familyCodeInput.value = familyCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
@@ -1958,7 +2003,7 @@
       { id: 'kitchen-cook-breakfast', title: 'Кухня: приготовление еды - завтрак', area: '1 этаж - кухня', points: 2, cadence: 'по необходимости' },
       { id: 'kitchen-cook-lunch', title: 'Кухня: приготовление еды - обед', area: '1 этаж - кухня', points: 3, cadence: 'по необходимости' },
       { id: 'kitchen-cook-dinner', title: 'Кухня: приготовление еды - ужин', area: '1 этаж - кухня', points: 3, cadence: 'по необходимости' },
-      { id: 'kitchen-cook-baking', title: 'Кухня: приготовление еды - выпечка', area: '1 этаж - кухня', points: 4, cadence: 'по необходимости' },
+      { id: 'kitchen-cook-baking', title: 'Кухня: приготовление еды - выпечка', area: '1 этаж - кухня', points: 3, cadence: 'по необходимости' },
       { id: 'car-refuel', title: 'Автомобиль: Заправить машину', area: 'гараж', points: 2, cadence: 'по необходимости' },
       { id: 'car-maintenance', title: 'Автомобиль: Сделать ТО', area: 'гараж', points: 5, cadence: 'по регламенту' },
       { id: 'car-tires', title: 'Автомобиль: Замена шин', area: 'гараж', points: 5, cadence: 'перед зимой и после зимы' },

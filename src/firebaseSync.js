@@ -2,11 +2,17 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import {
   doc,
+  collection,
   getDocFromServer,
+  getDocs,
   initializeFirestore,
+  limit,
   onSnapshot,
+  orderBy,
+  query,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 import {
   doc as liteDoc,
@@ -206,6 +212,71 @@ export async function getFamilyState(familyCode) {
   return snapshot.exists() ? snapshot.data() : null;
 }
 
+function getFamilyBackupsCollection(familyCode) {
+  return collection(getFirestoreDb(), 'families', normalizeFamilyCode(familyCode), 'backups');
+}
+
+export async function createFamilyBackup(familyCode, state, meta = {}) {
+  if (!isFirebaseConfigured()) throw new Error('Firebase не настроен');
+  const normalized = normalizeFamilyCode(familyCode);
+  if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
+  const user = await ensureAnonymousAuth();
+  const createdAtIso = new Date().toISOString();
+  const kind = meta.kind === 'daily' ? 'daily' : 'manual';
+  const backupId = kind === 'daily'
+    ? `daily-${createdAtIso.slice(0, 10)}`
+    : `manual-${createdAtIso.replace(/[^0-9]/g, '')}`;
+  const backupReference = doc(getFamilyBackupsCollection(normalized), backupId);
+  if (kind === 'daily' && (await getDocFromServer(backupReference)).exists()) {
+    return { id: backupId, createdAtIso, kind, existed: true };
+  }
+  await setDoc(backupReference, {
+    familyId: normalized,
+    state: toSharedFamilyState(state, normalized),
+    kind,
+    createdAt: serverTimestamp(),
+    createdAtIso,
+    createdBy: meta.memberId ?? 'unknown',
+    createdByDevice: meta.deviceId ?? user?.uid ?? 'unknown',
+  });
+  return { id: backupId, createdAtIso, kind };
+}
+
+export async function getLatestFamilyBackup(familyCode) {
+  if (!isFirebaseConfigured()) return null;
+  const normalized = normalizeFamilyCode(familyCode);
+  if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
+  await ensureAnonymousAuth();
+  const snapshots = await getDocs(query(
+    getFamilyBackupsCollection(normalized),
+    orderBy('createdAtIso', 'desc'),
+    limit(1),
+  ));
+  const snapshot = snapshots.docs[0];
+  return snapshot ? { id: snapshot.id, ...snapshot.data() } : null;
+}
+
+export async function restoreLatestFamilyBackup(familyCode, meta = {}) {
+  const normalized = normalizeFamilyCode(familyCode);
+  const backup = await getLatestFamilyBackup(normalized);
+  if (!backup?.state) throw new Error('Резервных копий этой семьи пока нет');
+  const user = await ensureAnonymousAuth();
+  const reference = getFamilyDoc(normalized);
+  const restored = toSharedFamilyState(backup.state, normalized);
+  await runTransaction(getFirestoreDb(), async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    transaction.set(reference, {
+      ...restored,
+      createdAt: snapshot.exists() ? snapshot.data().createdAt ?? serverTimestamp() : serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      updatedBy: meta.memberId ?? 'unknown',
+      updatedByDevice: meta.deviceId ?? user?.uid ?? 'unknown',
+      restoredFromBackup: backup.id,
+    });
+  }, { maxAttempts: 8 });
+  return restored;
+}
+
 export function subscribeFamilyState(familyCode, onChange, onError) {
   if (!isFirebaseConfigured() || !isValidFamilyCode(familyCode)) return () => {};
   let unsubscribe = () => {};
@@ -263,6 +334,16 @@ async function publishFamilyStateWithRetry(familyCode, state, meta = {}) {
   if (!isValidFamilyCode(normalized)) throw new Error('Некорректный код семьи');
   const user = await ensureAnonymousAuth();
   const reference = getFamilyDoc(normalized);
+  if (meta.memberId === 'mom') {
+    try {
+      const existing = await getFamilySnapshotFromServer(normalized);
+      if (existing.exists()) {
+        await createFamilyBackup(normalized, existing.data(), { ...meta, kind: 'daily' });
+      }
+    } catch (error) {
+      console.warn('Daily family backup failed; continuing synchronization', error);
+    }
+  }
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
       await runTransaction(getFirestoreDb(), async (transaction) => {

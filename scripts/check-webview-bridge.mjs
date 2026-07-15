@@ -4,6 +4,7 @@ import vm from 'node:vm';
 
 const source = await readFile(new URL('../App.js', import.meta.url), 'utf8');
 const firebaseSyncSource = await readFile(new URL('../src/firebaseSync.js', import.meta.url), 'utf8');
+const firestoreRulesSource = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
 const match = source.match(/const bridgeScript = `([\s\S]*?)`;\s*const diagnosticsScript/);
 assert.ok(match, 'bridgeScript was not found in App.js');
 
@@ -73,6 +74,8 @@ assert.match(source, /requestForcedSyncFromWebView\('startup'\)/);
 assert.match(source, /requestForcedSyncFromWebView\('foreground'\)/);
 assert.match(source, /Firebase background publish/);
 assert.match(source, /BackHandler\.addEventListener\('hardwareBackPress'/);
+assert.match(source, /window\.handleNativeBack/);
+assert.doesNotMatch(source, /BackHandler\.exitApp\(\)/);
 assert.match(firebaseSyncSource, /firebase\/firestore\/lite/);
 assert.match(firebaseSyncSource, /experimentalAutoDetectLongPolling: true/);
 assert.doesNotMatch(firebaseSyncSource, /experimentalForceLongPolling: true/);
@@ -80,5 +83,9 @@ assert.match(firebaseSyncSource, /retryTimer = setTimeout\(connect, delay\)/);
 assert.match(firebaseSyncSource, /let publishQueue = Promise\.resolve\(\)/);
 assert.match(firebaseSyncSource, /message\.includes\('stored version'\)/);
 assert.match(firebaseSyncSource, /\{ maxAttempts: 8 \}/);
+assert.match(firebaseSyncSource, /export async function createFamilyBackup/);
+assert.match(firebaseSyncSource, /export async function restoreLatestFamilyBackup/);
+assert.match(firebaseSyncSource, /daily-\$\{createdAtIso\.slice\(0, 10\)\}/);
+assert.match(firestoreRulesSource, /match \/backups\/\{backupId\}/);
 
 console.log('WebView bridge applies authoritative state; Firestore retries reads, listeners, and contended writes.');

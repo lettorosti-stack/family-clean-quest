@@ -472,33 +472,14 @@ export default function App() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      const shared = lastSharedStateRef.current;
-      if (!familyCode || !shared || !syncRef.current || !isFirebaseConfigured()) return false;
-      let exited = false;
-      const finishExit = () => {
-        if (exited) return;
-        exited = true;
-        BackHandler.exitApp();
-      };
-      setSyncStatus('syncing');
-      syncRef.current.publishFamilyState(familyCode, shared, {
-        memberId: shared.active,
-        deviceId,
-      })
-        .then(() => {
-          setLastSyncAt(new Date().toISOString());
-          setSyncStatus('connected');
-        })
-        .catch((error) => {
-          setSyncStatus('error');
-          pushDiagnostic(`Firebase exit publish: ${error?.message ?? error}`);
-        })
-        .finally(finishExit);
-      setTimeout(finishExit, 2200);
+      webViewRef.current?.injectJavaScript(`
+        if (typeof window.handleNativeBack === 'function') window.handleNativeBack();
+        true;
+      `);
       return true;
     });
     return () => subscription.remove();
-  }, [deviceId, familyCode, pushDiagnostic]);
+  }, []);
 
   const handleSyncCommand = useCallback(async (message) => {
     if (!isFirebaseConfigured() || !syncRef.current) throw new Error('Firebase не настроен');
@@ -562,8 +543,37 @@ export default function App() {
       return;
     }
 
+    if (action === 'backup') {
+      if (!familyCode) throw new Error('Сначала создайте семью или подключитесь по коду');
+      await syncRef.current.createFamilyBackup(familyCode, message.value || {}, {
+        memberId: message.value?.active,
+        deviceId,
+        kind: 'manual',
+      });
+      webViewRef.current?.postMessage(JSON.stringify({
+        type: 'syncStatus',
+        text: 'Резервная копия семьи создана',
+      }));
+      return;
+    }
+
+    if (action === 'restoreBackup') {
+      if (!familyCode) throw new Error('Сначала создайте семью или подключитесь по коду');
+      const restored = await syncRef.current.restoreLatestFamilyBackup(familyCode, {
+        memberId: message.value?.active,
+        deviceId,
+      });
+      lastAppliedRemoteSerializedRef.current = '';
+      applyRemoteFamilyState(restored, true);
+      webViewRef.current?.postMessage(JSON.stringify({
+        type: 'syncStatus',
+        text: 'Последняя резервная копия восстановлена',
+      }));
+      return;
+    }
+
     throw new Error('Неизвестная команда синхронизации');
-  }, [deviceId]);
+  }, [applyRemoteFamilyState, deviceId, familyCode]);
 
   const handleMessage = useCallback((event) => {
     let message;
