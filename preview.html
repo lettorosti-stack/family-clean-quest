@@ -177,6 +177,47 @@
     .notification-item.unread { background:#f4efff; border-color:#d9ccff; }
     .notification-kind { width:42px; height:42px; border-radius:13px; background:#fff; display:grid; place-items:center; font-size:20px; }
     .notification-time { color:#91899a; font-size:10px; margin-top:5px; }
+
+    /* Family Clean Quest 2.0 mobile UI */
+    :root { --bg:#f7f4f8; --ink:#262231; --muted:#81798a; --purple:#7655d5; --purple-soft:#eee7ff; --green:#4fb978; --line:#ebe5ef; }
+    body { background:linear-gradient(180deg,#f7f3fa 0,#f9f7fb 100%); color:var(--ink); font-family:Inter,Segoe UI,Arial,sans-serif; }
+    .phone { width:min(100%,520px); background:var(--bg); border-radius:0; border:0; box-shadow:0 0 45px rgba(54,40,70,.12); }
+    .screen { padding:18px 16px 94px; }
+    .top { align-items:flex-start; margin-bottom:14px; }
+    .kicker { color:#6f7b8d; letter-spacing:.08em; font-size:12px; }
+    h1 { font-size:30px; line-height:1.08; margin-top:4px; }
+    .members { gap:9px; margin:10px 0 14px; }
+    .member { min-width:0; border-radius:20px; padding:12px 10px; background:#fff; box-shadow:0 8px 22px rgba(43,32,59,.05); }
+    .member.active { background:#fff; box-shadow:0 0 0 2px var(--member-color),0 10px 25px rgba(43,32,59,.08); }
+    .member .name { font-size:14px; margin-top:6px; }
+    .member .points { font-size:19px; }
+    .score { border-radius:22px; border:1px solid var(--line); box-shadow:0 8px 24px rgba(43,32,59,.05); padding:15px; }
+    .tabs { position:fixed; left:50%; bottom:0; transform:translateX(-50%); width:min(100%,520px); z-index:30; grid-template-columns:repeat(5,1fr); margin:0; padding:7px 6px calc(7px + env(safe-area-inset-bottom)); border-radius:20px 20px 0 0; background:rgba(255,255,255,.98); border-top:1px solid var(--line); box-shadow:0 -10px 28px rgba(48,35,62,.09); }
+    .tab { min-width:0; min-height:56px; padding:6px 2px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:10px; line-height:1.1; }
+    .tab.active { background:var(--purple-soft); color:var(--purple); }
+    .tab .nav-icon { width:24px; height:24px; }
+    .section { margin:20px 0 10px; }
+    .section h2 { font-size:20px; }
+    .card { border-radius:19px; border:1px solid var(--line); box-shadow:0 7px 20px rgba(43,32,59,.045); margin-bottom:10px; }
+    .zone-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .zone { min-height:142px; border-radius:20px; padding:12px; background:#fff; box-shadow:0 7px 20px rgba(43,32,59,.04); }
+    .zone.wide { grid-column:1/-1; min-height:118px; }
+    .zone-icon { width:76px; height:76px; object-fit:contain; }
+    .zone-title { font-size:14px; line-height:1.2; }
+    .floor-title { margin:20px 2px 10px; font-size:17px; font-weight:900; }
+    .hero-card { display:grid; grid-template-columns:1fr 96px; gap:12px; align-items:center; padding:18px; border-radius:24px; background:linear-gradient(135deg,#fff,#f3edff); border:1px solid #e8defa; margin:4px 0 18px; }
+    .hero-card img { width:96px; height:96px; object-fit:contain; }
+    .hero-card h2 { margin:4px 0 7px; font-size:24px; }
+    .hero-kicker { color:var(--purple); font-size:12px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+    .family-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
+    .family-person { background:#fff; border:1px solid var(--line); border-radius:20px; padding:12px 8px; text-align:center; box-shadow:0 7px 18px rgba(43,32,59,.04); }
+    .family-person .avatar { margin:0 auto 7px; }
+    .family-person b,.family-person strong { display:block; }
+    .family-person b { font-size:13px; color:var(--member-color); }
+    .family-person strong { margin-top:4px; font-size:18px; }
+    .notification-button { box-shadow:0 7px 18px rgba(43,32,59,.06); }
+    @media(max-width:380px){ .screen{padding-left:12px;padding-right:12px}.tab{font-size:9px}.member{padding:10px 6px}.hero-card{grid-template-columns:1fr 76px}.hero-card img{width:76px;height:76px} }
+
 </style>
 </head>
 <body>
@@ -185,7 +226,7 @@
       <div class="top">
         <div>
           <div class="kicker">Family Clean Quest</div>
-          <h1>Семейные дела</h1>
+          <h1 id="screenTitle">Сегодня</h1>
         </div>
         <div class="top-actions">
           <button class="notification-button" id="notificationButton" aria-label="Уведомления">🔔<span id="notificationBadge" class="notification-badge"></span></button>
@@ -209,10 +250,11 @@
         </div>
       </div>
       <div class="tabs">
-        <button class="tab active" data-tab="home"><img class="nav-icon" src="assets/icons/home-house-transparent.png" alt=""> Дом</button>
+        <button class="tab active" data-tab="home"><img class="nav-icon" src="assets/icons/calendar-transparent.png" alt=""> Сегодня</button>
+        <button class="tab" data-tab="zones"><img class="nav-icon" src="assets/icons/home-house-transparent.png" alt=""> Дом</button>
         <button class="tab" data-tab="tasks"><img class="nav-icon" src="assets/icons/tasks-list-transparent.png" alt=""> Дела</button>
-        <button class="tab" data-tab="history"><img class="nav-icon" src="assets/icons/calendar-transparent.png" alt=""> Журнал</button>
         <button class="tab" data-tab="rewards"><img class="nav-icon" src="assets/icons/reward-gift-transparent.png" alt=""> Награды</button>
+        <button class="tab" data-tab="family"><img class="nav-icon" src="assets/icons/shared-tasks-transparent.png" alt=""> Семья</button>
       </div>
 
       <div class="toast" id="toast"></div>
@@ -1624,6 +1666,31 @@
       const clear = document.getElementById('clearFilter');
       if (clear) clear.onclick = () => { state.selectedZone = null; save(); render(); };
     }
+
+    function renderZones() {
+      return `
+        <div class="hero-card"><div><div class="hero-kicker">Наш дом</div><h2>Все помещения и зоны</h2><div class="sub">Полный список сохранён: два этажа, участок, гараж и помощь бабушке с дедушкой.</div></div><img src="assets/icons/home-house-transparent.png" alt=""></div>
+        ${zoneGroups.map(group => `
+          <div class="floor-title">${group.title}</div>
+          <div class="zone-grid">
+            ${group.zones.map(zone => {
+              const [label, color] = zoneStatus(zone);
+              return `<button class="zone ${zone.wide ? 'wide' : ''} ${state.selectedZone?.id === zone.id ? 'selected' : ''}" data-zone="${zone.id}">
+                <div class="zone-top"><b class="zone-title">${zone.title}</b>${zoneIcons[zone.id] ? `<span class="zone-icon-wrap"><img class="zone-icon" src="${zoneIcons[zone.id]}" alt="${zone.title}"><span class="zone-zoom" role="button" tabindex="0" data-zone-zoom="${zone.id}" aria-label="Увеличить иконку">⌕</span></span>` : ''}</div><span class="status ${color}">${label}</span>
+              </button>`;
+            }).join('')}
+          </div>`).join('')}`;
+    }
+    function renderFamily() {
+      const recent = state.completed.slice(0, 8);
+      return `
+        <div class="hero-card family-hero"><div><div class="hero-kicker">Команда</div><h2>${teamScore()} баллов вместе</h2><div class="sub">Личные баллы каждого сохраняются отдельно. Семейный баланс растёт от реальных выполненных дел.</div></div><img src="assets/icons/shared-tasks-transparent.png" alt=""></div>
+        <div class="family-grid">${members.map(item => `<div class="family-person" style="--member-color:${item.color}">${avatarHtml(item)}<b>${item.name}</b><strong>${personalScore(item.id)} б.</strong></div>`).join('')}</div>
+        <div class="section"><img class="nav-icon big" src="assets/icons/history-journal-transparent.png" alt=""><div><h2>Последние семейные дела</h2><div class="sub">История остаётся частью синхронизации и не обнуляется при обновлении.</div></div></div>
+        ${recent.length ? recent.map(item => `<div class="card"><div class="card-main"><div class="task-title">${item.title}</div><div class="meta">${member(item.memberId)?.name || 'Участник'} · ${item.date} · +${item.points} б.</div></div></div>`).join('') : '<div class="empty">Пока нет выполненных дел.</div>'}
+      `;
+    }
+
     function render() {
       renderShell();
       const content = document.getElementById('content');
@@ -1632,10 +1699,13 @@
         bindContent();
         return;
       }
+      const screenTitle = document.getElementById('screenTitle');
+      if (screenTitle) screenTitle.textContent = ({home:'Сегодня', zones:'Дом', tasks:'Дела', rewards:'Награды', family:'Семья'})[state.tab] || 'Сегодня';
       if (state.tab === 'home') content.innerHTML = renderHome();
+      if (state.tab === 'zones') content.innerHTML = renderZones();
       if (state.tab === 'tasks') content.innerHTML = renderTasks();
-      if (state.tab === 'history') content.innerHTML = renderHistory();
       if (state.tab === 'rewards') content.innerHTML = renderRewards();
+      if (state.tab === 'family') content.innerHTML = renderFamily();
       bindContent();
     }
     function completeTask(task, options = {}) {
