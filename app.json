@@ -28,7 +28,8 @@
       "firebaseAppId": "1:172260483224:web:55e905eb6ff42752f2b0ed"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-status-bar"
     ]
   }
 }
