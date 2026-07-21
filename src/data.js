@@ -169,8 +169,24 @@ export const teamRewards = [
 ];
 
 export const initialState = {
+  schemaVersion: 5,
   activeMemberId: null,
   avatars: {},
+  avatarUpdatedAt: {},
   completed: [],
   purchases: [],
+  customTasks: [],
+  passwordResetRequests: [],
+  taskAssignments: [],
+  taskReviews: [],
+  notifications: [],
+  syncTombstones: {
+    completed: {},
+    purchases: {},
+    customTasks: {},
+    passwordResetRequests: {},
+    taskAssignments: {},
+    taskReviews: {},
+    notifications: {},
+  },
 };

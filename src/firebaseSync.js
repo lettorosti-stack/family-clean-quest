@@ -18,7 +18,7 @@ import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig';
 export { isFirebaseConfigured };
 const FAMILY_CODE_LENGTH = 12;
 const FAMILY_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
+const RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests', 'taskAssignments', 'taskReviews', 'notifications'];
 let firestoreInstance = null;
 let firestoreLiteInstance = null;
 let publishQueue = Promise.resolve();
@@ -149,7 +149,7 @@ export function toSharedFamilyState(state, familyCode) {
   const normalized = normalizeFamilyCode(familyCode ?? state?.familyId);
   const tombstones = mergeTombstones(state?.syncTombstones, {});
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     familyId: normalized,
     avatars: toObject(state?.avatars),
     avatarUpdatedAt: toObject(state?.avatarUpdatedAt),
@@ -161,6 +161,9 @@ export function toSharedFamilyState(state, familyCode) {
       [],
       tombstones.passwordResetRequests,
     ),
+    taskAssignments: mergeRecords(state?.taskAssignments, [], tombstones.taskAssignments),
+    taskReviews: mergeRecords(state?.taskReviews, [], tombstones.taskReviews),
+    notifications: mergeRecords(state?.notifications, [], tombstones.notifications),
     syncTombstones: tombstones,
     cloudFolderUrl: typeof state?.cloudFolderUrl === 'string' ? state.cloudFolderUrl : '',
   };
@@ -176,7 +179,7 @@ export function mergeFamilyState(localState, remoteState) {
   const avatarState = mergeAvatars(localState, remote);
   return {
     ...localState,
-    schemaVersion: 4,
+    schemaVersion: 5,
     familyId,
     avatars: avatarState.avatars,
     avatarUpdatedAt: avatarState.avatarUpdatedAt,
@@ -188,6 +191,9 @@ export function mergeFamilyState(localState, remoteState) {
       remote.passwordResetRequests,
       tombstones.passwordResetRequests,
     ),
+    taskAssignments: mergeRecords(localState?.taskAssignments, remote.taskAssignments, tombstones.taskAssignments),
+    taskReviews: mergeRecords(localState?.taskReviews, remote.taskReviews, tombstones.taskReviews),
+    notifications: mergeRecords(localState?.notifications, remote.notifications, tombstones.notifications),
     syncTombstones: tombstones,
     cloudFolderUrl: remote.cloudFolderUrl || localState?.cloudFolderUrl || '',
   };

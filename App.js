@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -31,7 +31,7 @@ const bridgeScript = `
   if (window.__familyCleanBridgeInstalled) return true;
   window.__familyCleanBridgeInstalled = true;
   var STORAGE_KEY = 'cleanQuestPreview';
-  var RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests'];
+  var RECORD_GROUPS = ['completed', 'purchases', 'customTasks', 'passwordResetRequests', 'taskAssignments', 'taskReviews', 'notifications'];
 
   function readState() {
     try {
@@ -122,6 +122,9 @@ const bridgeScript = `
       purchases: mergeRecords(replaceSharedState ? [] : current.purchases, remote.purchases, tombstones.purchases),
       customTasks: mergeRecords(replaceSharedState ? [] : current.customTasks, remote.customTasks, tombstones.customTasks),
       passwordResetRequests: mergeRecords(replaceSharedState ? [] : current.passwordResetRequests, remote.passwordResetRequests, tombstones.passwordResetRequests),
+      taskAssignments: mergeRecords(replaceSharedState ? [] : current.taskAssignments, remote.taskAssignments, tombstones.taskAssignments),
+      taskReviews: mergeRecords(replaceSharedState ? [] : current.taskReviews, remote.taskReviews, tombstones.taskReviews),
+      notifications: mergeRecords(replaceSharedState ? [] : current.notifications, remote.notifications, tombstones.notifications),
       syncTombstones: tombstones,
       cloudFolderUrl: remote.cloudFolderUrl || current.cloudFolderUrl || '',
       active: current.active || null,

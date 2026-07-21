@@ -167,7 +167,17 @@
       body { padding: 0; background: #f8fafc; }
       .phone { width: 100%; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
     }
-  </style>
+  
+    .notification-button { position:relative; width:42px; height:42px; border:1px solid #e5dfeb; border-radius:14px; background:#fff; display:grid; place-items:center; font-size:20px; cursor:pointer; }
+    .notification-badge { position:absolute; right:-4px; top:-5px; min-width:18px; height:18px; padding:0 4px; border-radius:9px; background:#e65f61; color:#fff; font-size:10px; font-weight:800; place-items:center; }
+    .notification-modal { position:fixed; inset:0; z-index:90; display:none; align-items:flex-end; justify-content:center; background:rgba(35,28,42,.35); }
+    .notification-modal.show { display:flex; }
+    .notification-modal-card { width:min(100%,520px); max-height:82vh; overflow:auto; background:#fff; border-radius:24px 24px 0 0; padding:20px 18px calc(24px + env(safe-area-inset-bottom)); }
+    .notification-item { width:100%; display:grid; grid-template-columns:42px 1fr; gap:10px; text-align:left; border:1px solid #ece7f0; background:#fff; border-radius:16px; padding:12px; margin-top:9px; }
+    .notification-item.unread { background:#f4efff; border-color:#d9ccff; }
+    .notification-kind { width:42px; height:42px; border-radius:13px; background:#fff; display:grid; place-items:center; font-size:20px; }
+    .notification-time { color:#91899a; font-size:10px; margin-top:5px; }
+</style>
 </head>
 <body>
   <main class="phone">
@@ -178,6 +188,7 @@
           <h1>Семейные дела</h1>
         </div>
         <div class="top-actions">
+          <button class="notification-button" id="notificationButton" aria-label="Уведомления">🔔<span id="notificationBadge" class="notification-badge"></span></button>
           <div class="sync-control"><button class="sync-btn" id="topSync">Синхр.</button><div class="sync-indicator" id="topSyncStatus">не запускалась</div></div>
           <button class="logout" id="topLogout">Выйти</button>
         </div>
@@ -208,6 +219,15 @@
       <div id="content"></div>
     </div>
   </main>
+  <div class="notification-modal" id="notificationModal">
+    <div class="notification-modal-card">
+      <div class="modal-top">
+        <div class="modal-title">Уведомления</div>
+        <button class="small-btn" id="closeNotificationModal">Закрыть</button>
+      </div>
+      <div id="notificationList"></div>
+    </div>
+  </div>
   <div class="avatar-modal" id="avatarModal">
     <div class="avatar-modal-card">
       <div class="modal-top">
@@ -681,7 +701,10 @@
         { id: 2, title: 'Гостиная: убрать вещи по местам', area: '1 этаж - гостиная', points: 2, memberId: 'veronika', date: today() }
       ],
       purchases: [],
-      passwordResetRequests: []
+      passwordResetRequests: [],
+      taskAssignments: [],
+      taskReviews: [],
+      notifications: []
     };
     let avatarPickerOpen = false;
     let avatarPreview = null;
@@ -702,8 +725,12 @@
     state.customTasks = state.customTasks || [];
     state.passwords = state.passwords || {};
     state.passwordResetRequests = state.passwordResetRequests || [];
+    state.taskAssignments = state.taskAssignments || [];
+    state.taskReviews = state.taskReviews || [];
+    state.notifications = state.notifications || [];
+    state.schemaVersion = 5;
     state.syncTombstones = state.syncTombstones || {};
-    ['completed', 'purchases', 'customTasks', 'passwordResetRequests'].forEach(group => {
+    ['completed', 'purchases', 'customTasks', 'passwordResetRequests', 'taskAssignments', 'taskReviews', 'notifications'].forEach(group => {
       state.syncTombstones[group] = state.syncTombstones[group] || {};
     });
     state.cloudFolderUrl = state.cloudFolderUrl || DEFAULT_CLOUD_FOLDER_URL;
@@ -844,6 +871,47 @@
       } else {
         showToast('В браузерном макете синхронизация только сохраняет данные на этом устройстве.');
       }
+    }
+    function notificationId(prefix) {
+      return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+    function addNotification(memberId, type, title, text, action = {}) {
+      if (!memberId) return;
+      state.notifications.unshift({
+        id: notificationId(type), memberId, type, title, text,
+        taskId: action.taskId || '', rewardId: action.rewardId || '',
+        readAt: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+    }
+    function unreadNotifications(memberId = state.active) {
+      return state.notifications.filter(item => item.memberId === memberId && !item.readAt);
+    }
+    function openNotifications() {
+      const list = state.notifications.filter(item => item.memberId === state.active);
+      document.getElementById('notificationList').innerHTML = list.length ? list.map(item => `
+        <button class="notification-item ${item.readAt ? '' : 'unread'}" data-notification-id="${item.id}">
+          <div class="notification-kind">${item.type === 'assignment' ? '📋' : item.type === 'task-approved' ? '✅' : item.type === 'task-rework' ? '↩️' : '🎁'}</div>
+          <div><div class="task-title">${item.title}</div><div class="meta">${item.text}</div><div class="notification-time">${new Date(item.createdAt).toLocaleString('ru-RU')}</div></div>
+        </button>`).join('') : '<div class="empty-state">Новых уведомлений пока нет.</div>';
+      document.getElementById('notificationModal').classList.add('show');
+      document.querySelectorAll('[data-notification-id]').forEach(btn => btn.onclick = () => {
+        const item = state.notifications.find(entry => entry.id === btn.dataset.notificationId);
+        if (!item) return;
+        item.readAt = item.readAt || new Date().toISOString();
+        item.updatedAt = new Date().toISOString();
+        if (item.rewardId) state.tab = 'rewards';
+        else if (item.taskId) state.tab = 'tasks';
+        save(); closeNotifications(); render();
+      });
+    }
+    function closeNotifications() {
+      document.getElementById('notificationModal').classList.remove('show');
+    }
+    function notifyTaskAssigned(assignment) {
+      addNotification(assignment.memberId, 'assignment', 'Новое задание от мамы', assignment.title || 'Вам назначено новое дело', { taskId: assignment.taskId });
+    }
+    function notifyTaskReviewed(review) {
+      addNotification(review.memberId, review.status === 'approved' ? 'task-approved' : 'task-rework', review.status === 'approved' ? 'Мама подтвердила задачу' : 'Нужно немного доделать', review.comment || review.title || 'Откройте задачу, чтобы посмотреть результат.', { taskId: review.taskId });
     }
     function personalScore(memberId) {
       const earned = state.completed.filter(x => x.memberId === memberId).reduce((sum, x) => sum + x.points, 0);
@@ -1000,7 +1068,11 @@
         showToast('Подтверждать награды может только мама.');
         return;
       }
+      const rewardItem = state.purchases.find(item => item.id === id);
       state.purchases = state.purchases.map(item => item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item);
+      if (rewardItem?.memberId && rewardItem.memberId !== 'mom') {
+        addNotification(rewardItem.memberId, status === 'approved' ? 'reward-approved' : 'reward-rejected', status === 'approved' ? 'Награда согласована' : 'Награда пока не согласована', status === 'approved' ? `${rewardItem.title} — мама подтвердила запрос.` : `${rewardItem.title} — мама отклонила запрос.`, { rewardId: String(id) });
+      }
       save();
       showToast(status === 'approved' ? 'Награда подтверждена.' : 'Заявка отклонена.');
       render();
@@ -1313,6 +1385,12 @@
       document.querySelector('.tabs').style.display = state.active ? 'grid' : 'none';
       document.getElementById('topLogout').style.display = state.active ? 'block' : 'none';
       document.getElementById('topSync').style.display = state.active ? 'block' : 'none';
+      const notificationButton = document.getElementById('notificationButton');
+      const notificationBadge = document.getElementById('notificationBadge');
+      if (notificationButton) { notificationButton.style.display = state.active ? 'grid' : 'none'; notificationButton.onclick = openNotifications; }
+      if (notificationBadge) { const count = unreadNotifications().length; notificationBadge.textContent = count > 9 ? '9+' : String(count || ''); notificationBadge.style.display = count ? 'grid' : 'none'; }
+      document.getElementById('closeNotificationModal').onclick = closeNotifications;
+      document.getElementById('notificationModal').onclick = event => { if (event.target.id === 'notificationModal') closeNotifications(); };
     }
     function renderHome() {
       const personalTasks = personalTasksForActive();
@@ -1822,8 +1900,9 @@
           voteTeamReward(existing.id);
           return;
         }
+        const teamRewardId = Date.now();
         state.purchases.unshift({
-          id: Date.now(),
+          id: teamRewardId,
           title: reward.title,
           points: reward.points,
           kind,
@@ -1835,6 +1914,7 @@
           date: today(),
           updatedAt: new Date().toISOString()
         });
+        members.filter(person => person.id !== state.active).forEach(person => addNotification(person.id, 'reward-vote', 'Согласование семейной награды', `${member(state.active).name} предлагает: ${reward.title}.`, { rewardId: String(teamRewardId) }));
         save();
         showToast('Командная награда вынесена на голосование.');
         render();
@@ -1878,6 +1958,7 @@
       item.status = 'approved';
       item.plannedDate = plannedDate;
       item.updatedAt = new Date().toISOString();
+      members.filter(person => person.role === 'child').forEach(person => addNotification(person.id, 'reward-approved', 'Семейная награда согласована', `${item.title} запланирована на ${plannedDate}.`, { rewardId: String(item.id) }));
       save();
       showToast('Дата командной награды назначена.');
       render();
