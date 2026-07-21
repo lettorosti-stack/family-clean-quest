@@ -218,6 +218,16 @@
     .notification-button { box-shadow:0 7px 18px rgba(43,32,59,.06); }
     @media(max-width:380px){ .screen{padding-left:12px;padding-right:12px}.tab{font-size:9px}.member{padding:10px 6px}.hero-card{grid-template-columns:1fr 76px}.hero-card img{width:76px;height:76px} }
 
+
+    /* UI V2 WebView overlay fix */
+    html, body { overflow-x: hidden; }
+    .phone { overflow: hidden; }
+    .screen { position: relative; overflow-x: hidden; }
+    .tabs { left: 50%; right: auto; }
+    .notification-modal, .avatar-modal, .quote-modal, .avatar-editor-modal { pointer-events: none; }
+    .notification-modal.show, .avatar-modal.show, .quote-modal.show, .avatar-editor-modal.show { pointer-events: auto; }
+    .notification-modal-card, .avatar-modal-card, .quote-card, .avatar-editor-card { position: relative; }
+
 </style>
 </head>
 <body>
@@ -2225,5 +2235,16 @@
     };
     render();
   </script>
+
+<script>
+(function(){
+  window.addEventListener('load', function(){
+    ['notificationModal','avatarModal','quoteModal','avatarEditorModal'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){ el.classList.remove('show'); }
+    });
+  });
+})();
+</script>
 </body>
 </html>
